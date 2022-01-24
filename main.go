@@ -123,7 +123,7 @@ func main() {
 
 	logrus.Traceln(datas, len(datas))
 
-	var test string
+	var text string
 	err = chromedp.Run(ctx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
@@ -133,11 +133,12 @@ func main() {
 			}
 			return nil
 		}),
-		chromedp.Navigate(`http://stockpage.10jqka.com.cn/600519/bonus/`),
-		chromedp.WaitVisible(`#bonus_table > tbody > tr:nth-child(2) > td:nth-child(10)`),
-		chromedp.Text(`#bonus_table > tbody > tr:nth-child(2) > td:nth-child(10)`, &test),
+		chromedp.Navigate(`http://stockpage.10jqka.com.cn/` + "600519"),
+		chromedp.WaitVisible(`#stockNamePlace`, chromedp.ByID),
+		chromedp.Evaluate(`document.querySelector('#stockNamePlace').getAttribute('stockname');`, &text),
 	)
 	if err != nil {
 		logrus.Error(err)
+		return
 	}
 }
