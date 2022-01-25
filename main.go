@@ -133,9 +133,13 @@ func main() {
 			}
 			return nil
 		}),
-		chromedp.Navigate(`http://stockpage.10jqka.com.cn/` + "600519"),
-		chromedp.WaitVisible(`#stockNamePlace`, chromedp.ByID),
-		chromedp.Evaluate(`document.querySelector('#stockNamePlace').getAttribute('stockname');`, &text),
+		//chromedp.Navigate(`http://stockpage.10jqka.com.cn/realHead_v2.html#hs_` + "600519"),
+		chromedp.Navigate(`http://stockpage.10jqka.com.cn/600519/bonus/#bonuslist`),
+		//chromedp.WaitVisible(`#fvaluep`, chromedp.ByID),
+		chromedp.Evaluate(`bt = function getBt(){
+            return document.getElementById('dataifm').contentWindow.document.querySelector('#bonus_table>tbody').children[1].children[9].innerText;
+        }();   `, &text),
+		//document.getElementById('iframe_id').contentWindow.document.getElementById('tvaluep')
 	)
 	if err != nil {
 		logrus.Error(err)
