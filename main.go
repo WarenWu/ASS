@@ -15,7 +15,7 @@ import (
 	"ASS/utils"
 )
 
-func main4() {
+func main() {
 
 	// 禁用chrome headless
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
@@ -125,47 +125,6 @@ func main4() {
 
 	var text string
 	err = chromedp.Run(ctx,
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
-			if err != nil {
-				logrus.Error(err)
-				return err
-			}
-			return nil
-		}),
-		//chromedp.Navigate(`http://stockpage.10jqka.com.cn/realHead_v2.html#hs_` + "600519"),
-		chromedp.Navigate(`http://stockpage.10jqka.com.cn/600519/bonus/#bonuslist`),
-		//chromedp.WaitVisible(`#fvaluep`, chromedp.ByID),
-		chromedp.Evaluate(`bt = function getBt(){
-            return document.getElementById('dataifm').contentWindow.document.querySelector('#bonus_table>tbody').children[1].children[9].innerText;
-        }();   `, &text),
-	)
-	if err != nil {
-		logrus.Error(err)
-		return
-	}
-}
-
-func main()  {
-	// 禁用chrome headless
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", false),
-		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
-	)
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancel()
-
-	// create chrome instance
-	ctx, cancel := chromedp.NewContext(
-		allocCtx,
-		chromedp.WithLogf(logrus.Printf),
-	)
-	defer cancel()
-
-	const expr = `delete navigator.__proto__.webdriver;`
-
-	var text string
-	err := chromedp.Run(ctx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
 			if err != nil {

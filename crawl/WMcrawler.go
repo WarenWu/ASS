@@ -2,7 +2,6 @@ package crawl
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -13,8 +12,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
-	"ASS/db"
 	"ASS/utils"
+	"ASS/db"
 )
 
 type StockCommonInfo struct {
@@ -27,9 +26,7 @@ type StockCommonInfo struct {
 type WMCrawler struct {
 	FirstCondition string
 	Duration       int
-	CommonInfos    map[string]*StockCommonInfo
 }
-
 
 func (crawler *WMCrawler) CrawlFromIndexOfA(condition string) string {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
@@ -157,6 +154,17 @@ func (crawler *WMCrawler) GetStockInfoOfA(stockCode string, filter Filter) []map
 	flags := filter()
 	stockInfos := make([]map[string]string, crawler.Duration)
 
+	//生成数据库数据
+	year:=time.Now().Year()
+	for i:=1; i<=crawler.Duration; i++{
+		date:=strconv.Itoa(year - i)
+		stockInfo := &db.StockInfo{
+			Code:stockCode,
+			Date: date,
+		}
+		crawler.updateStockInfo(stockCode,date,stockInfo)
+	}
+
 	//更新数据库数据
 	for _, flag := range flags {
 		switch flag {
@@ -214,7 +222,7 @@ func (crawler *WMCrawler) crawlStockPEOfA(code string) {
 			}
 			return nil
 		}),
-		chromedp.Navigate(`http://stockpage.10jqka.com.cn/`+code),
+		chromedp.Navigate(`http://stockpage.10jqka.com.cn/` + code),
 		chromedp.WaitVisible(`#fvaluep`, chromedp.ByID),
 		chromedp.Text(`#fvaluep`, &text),
 	)
@@ -226,17 +234,15 @@ func (crawler *WMCrawler) crawlStockPEOfA(code string) {
 		logrus.Error(err)
 		return
 	}
-	stockCommonInfo := &StockCommonInfo{Code: code, PE: text}
+	stockCommonInfo := &StockCommonInfo{Code: code,PE:text }
 	crawler.updateStockCommonInfo(stockCommonInfo)
 
-	stockInfos := make([]db.StockInfo, 0)
-	db.DbEngine().Where("code = ?", code).Find(&stockInfos)
-	for i, _ := range stockInfos {
+	stockInfos := make([]db.StockInfo,0)
+	db.DbEngine().Where("code = ?",code).Find(&stockInfos)
+	for i,_:=range stockInfos{
 		stockInfos[i].PE = text
-		crawler.updateStockInfo(code, stockInfos[i].Date, &stockInfos[i])
+		crawler.updateStockInfo(code,stockInfos[i].Date,&stockInfos[i])
 	}
-
-	crawler.CommonInfos[code].PE = text
 }
 
 func (crawler *WMCrawler) crawlStockNameOfA(code string) {
@@ -266,7 +272,7 @@ func (crawler *WMCrawler) crawlStockNameOfA(code string) {
 			}
 			return nil
 		}),
-		chromedp.Navigate(`http://stockpage.10jqka.com.cn/`+code),
+		chromedp.Navigate(`http://stockpage.10jqka.com.cn/` + "600519"),
 		chromedp.WaitVisible(`#stockNamePlace`, chromedp.ByID),
 		chromedp.Evaluate(`document.querySelector('#stockNamePlace').getAttribute('stockname');`, &text),
 	)
@@ -278,17 +284,15 @@ func (crawler *WMCrawler) crawlStockNameOfA(code string) {
 		logrus.Error(err)
 		return
 	}
-	stockCommonInfo := &StockCommonInfo{Code: code, Name: text}
+	stockCommonInfo := &StockCommonInfo{Code: code,Name:text }
 	crawler.updateStockCommonInfo(stockCommonInfo)
 
-	stockInfos := make([]db.StockInfo, 0)
-	db.DbEngine().Where("code = ?", code).Find(&stockInfos)
-	for i, _ := range stockInfos {
+	stockInfos := make([]db.StockInfo,0)
+	db.DbEngine().Where("code = ?",code).Find(&stockInfos)
+	for i,_:=range stockInfos{
 		stockInfos[i].Name = text
-		crawler.updateStockInfo(code, stockInfos[i].Date, &stockInfos[i])
+		crawler.updateStockInfo(code,stockInfos[i].Date,&stockInfos[i])
 	}
-
-	crawler.CommonInfos[code].Name = text
 }
 
 func (crawler *WMCrawler) crawlStockPriceOfA(code string) {
@@ -318,7 +322,7 @@ func (crawler *WMCrawler) crawlStockPriceOfA(code string) {
 			}
 			return nil
 		}),
-		chromedp.Navigate(`http://stockpage.10jqka.com.cn/`+"600519"),
+		chromedp.Navigate(`http://stockpage.10jqka.com.cn/` + "600519"),
 		chromedp.WaitVisible(`#hexm_curPrice`, chromedp.ByID),
 		chromedp.Text(`#hexm_curPrice`, &text),
 	)
@@ -330,164 +334,86 @@ func (crawler *WMCrawler) crawlStockPriceOfA(code string) {
 		logrus.Error(err)
 		return
 	}
-	stockCommonInfo := &StockCommonInfo{Code: code, Price: text}
+	stockCommonInfo := &StockCommonInfo{Code: code,Price:text }
 	crawler.updateStockCommonInfo(stockCommonInfo)
 
-	stockInfos := make([]db.StockInfo, 0)
-	db.DbEngine().Where("code = ?", code).Find(&stockInfos)
-	for i, _ := range stockInfos {
+	stockInfos := make([]db.StockInfo,0)
+	db.DbEngine().Where("code = ?",code).Find(&stockInfos)
+	for i,_:=range stockInfos{
 		stockInfos[i].Price = text
-		crawler.updateStockInfo(code, stockInfos[i].Date, &stockInfos[i])
+		crawler.updateStockInfo(code,stockInfos[i].Date,&stockInfos[i])
 	}
-
-	crawler.CommonInfos[code].Price = text
 }
 
 func (crawler *WMCrawler) crawlStockROEOfA(code string) {
-	condition := code + ` 连续 ` + strconv.Itoa(crawler.Duration) + ` 年 ROE`
+	condition:= code + ` 连续 `+strconv.Itoa(crawler.Duration)+` 年 ROE`
 	jsonResp := crawler.CrawlFromIndexOfA(condition)
 	if jsonResp == "" {
-		return
+		return 
 	}
-
+	
 	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.0.data.datas")
 	for _, data := range datasObject.Array() {
-		dataInfo := data.Value().(map[string]interface{})
-		roe := strconv.FormatFloat(dataInfo["ROE"].(float64), 'f', 6, 64)
-		date := strconv.FormatUint(dataInfo["时间"].(uint64), 10)[0:3]
-		stockInfo := db.StockInfo{
-			Code:  code,
-			Name: crawler.CommonInfos[code].Name,
-			PE:    crawler.CommonInfos[code].PE,
-			Price: crawler.CommonInfos[code].Price,
-			ROE:   roe,
-		}
-		crawler.updateStockInfo(code, date, &stockInfo)
+		roeInfo := data.Value().(map[string]interface{})
+		roe := strconv.FormatFloat(roeInfo["ROE"].(float64),'f',6,64)
+		date:= strconv.FormatUint(roeInfo["时间"].(uint64),10)[0:3]
+		stockInfo := db.StockInfo{ROE: roe}
+		crawler.updateStockInfo(code,date,&stockInfo)
 	}
 }
 
 func (crawler *WMCrawler) crawlStockCashRatioOfA(code string) {
-	condition := code + ` 连续 ` + strconv.Itoa(crawler.Duration) + ` 年 净利润现金含量`
+	condition:= code + ` 连续 `+strconv.Itoa(crawler.Duration)+` 年 净利润现金含量`
 	jsonResp := crawler.CrawlFromIndexOfA(condition)
 	if jsonResp == "" {
-		return
+		return 
 	}
-
+	
 	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.1.data.datas")
 	for _, data := range datasObject.Array() {
-		dataInfo := data.Value().(map[string]interface{})
-		cashRatio := strconv.FormatFloat(dataInfo["净利润现金含量占比"].(float64), 'f', 6, 64)
-		date := dataInfo["时间"].(string)[0:3]
-		stockInfo := db.StockInfo{
-			Code:      code,
-			Name: crawler.CommonInfos[code].Name,
-			PE:        crawler.CommonInfos[code].PE,
-			Price:     crawler.CommonInfos[code].Price,
-			CashRatio: cashRatio,
-		}
-		crawler.updateStockInfo(code, date, &stockInfo)
+		roeInfo := data.Value().(map[string]interface{})
+		cashRatio := strconv.FormatFloat(roeInfo["净利润现金含量占比"].(float64),'f',6,64)
+		date:= roeInfo["时间"].(string)[0:3]
+		stockInfo := db.StockInfo{CashRatio: cashRatio}
+		crawler.updateStockInfo(code,date,&stockInfo)
 	}
 }
 
 func (crawler *WMCrawler) crawlStockAssetLiabilityRatioOfA(code string) {
-	condition := code + ` 连续 ` + strconv.Itoa(crawler.Duration) + ` 年 资产负债率`
+	condition:= code + ` 连续 `+strconv.Itoa(crawler.Duration)+` 年 资产负债率`
 	jsonResp := crawler.CrawlFromIndexOfA(condition)
 	if jsonResp == "" {
-		return
+		return 
 	}
-
+	
 	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.0.data.datas")
 	for _, data := range datasObject.Array() {
-		dataInfo := data.Value().(map[string]interface{})
-		assetLiabilityRatio := strconv.FormatFloat(dataInfo["资产负债率(%)"].(float64), 'f', 6, 64)
-		date := strconv.FormatUint(dataInfo["时间区间"].(uint64), 10)[0:3]
-		stockInfo := db.StockInfo{
-			Code:                code,
-			Name: crawler.CommonInfos[code].Name,
-			PE:                  crawler.CommonInfos[code].PE,
-			Price:               crawler.CommonInfos[code].Price,
-			AssetLiabilityRatio: assetLiabilityRatio,
-		}
-		crawler.updateStockInfo(code, date, &stockInfo)
+		roeInfo := data.Value().(map[string]interface{})
+		assetLiabilityRatio := strconv.FormatFloat(roeInfo["资产负债率(%)"].(float64),'f',6,64)
+		date:= strconv.FormatUint(roeInfo["时间区间"].(uint64),10)[0:3]
+		stockInfo := db.StockInfo{AssetLiabilityRatio: assetLiabilityRatio}
+		crawler.updateStockInfo(code,date,&stockInfo)
 	}
 }
 
 func (crawler *WMCrawler) crawlStockGrossProfitRatioOfA(code string) {
-	condition := code + ` 连续 ` + strconv.Itoa(crawler.Duration) + ` 年 毛利率`
+	condition:= code + ` 连续 `+strconv.Itoa(crawler.Duration)+` 年 毛利率`
 	jsonResp := crawler.CrawlFromIndexOfA(condition)
 	if jsonResp == "" {
-		return
+		return 
 	}
-
-	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.1.tab_list.0.list.0.data.datas")
+	
+	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.1.data.datas")
 	for _, data := range datasObject.Array() {
-		dataInfo := data.Value().(map[string]interface{})
-		grossProfitRatio := strconv.FormatFloat(dataInfo["销售毛利率"].(float64), 'f', 6, 64)
-		date := dataInfo["年度"].(string)
-		stockInfo := db.StockInfo{
-			Code:             code,
-			Name: crawler.CommonInfos[code].Name,
-			PE:               crawler.CommonInfos[code].PE,
-			Price:            crawler.CommonInfos[code].Price,
-			GrossProfitRatio: grossProfitRatio,
-		}
-		crawler.updateStockInfo(code, date, &stockInfo)
+		roeInfo := data.Value().(map[string]interface{})
+		assetLiabilityRatio := strconv.FormatFloat(roeInfo["资产负债率(%)"].(float64),'f',6,64)
+		date:= strconv.FormatUint(roeInfo["时间区间"].(uint64),10)[0:3]
+		stockInfo := db.StockInfo{AssetLiabilityRatio: assetLiabilityRatio}
+		crawler.updateStockInfo(code,date,&stockInfo)
 	}
 }
 
 func (crawler *WMCrawler) crawlStockDividendRatioOfA(code string) {
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", false),
-		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
-	)
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancel()
-
-	// create chrome instance
-	ctx, cancel := chromedp.NewContext(
-		allocCtx,
-		chromedp.WithLogf(logrus.Printf),
-	)
-	defer cancel()
-
-	const expr = `delete navigator.__proto__.webdriver;` //绕过爬虫检测
-
-	var text string
-	//var nodes []*cdp.Node
-	err := chromedp.Run(ctx,
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
-			if err != nil {
-				logrus.Error(err)
-				return err
-			}
-			return nil
-		}),
-		chromedp.Navigate(`http://stockpage.10jqka.com.cn/`+code+`/bonus/#bonuslist`),
-		chromedp.WaitVisible(`#bonus_table`, chromedp.ByID),
-		//chromedp.Evaluate(`document.querySelector('#bonus_table tbody').getAttribute('stockname');`, &text),
-		//chromedp.Nodes(`#bonus_table tbody`,&nodes)
-		//fmt.Println(nodes)
-	)
-	if err != nil {
-		logrus.Error(err)
-		return
-	}
-	if err != nil {
-		logrus.Error(err)
-		return
-	}
-	stockCommonInfo := &StockCommonInfo{Code: code, Name: text}
-	crawler.updateStockCommonInfo(stockCommonInfo)
-
-	stockInfos := make([]db.StockInfo, 0)
-	db.DbEngine().Where("code = ?", code).Find(&stockInfos)
-	for i, _ := range stockInfos {
-		stockInfos[i].Name = text
-		crawler.updateStockInfo(code, stockInfos[i].Date, &stockInfos[i])
-	}
-
-	crawler.CommonInfos[code].Name = text
 
 }
 
@@ -497,26 +423,28 @@ func (crawler *WMCrawler) crawlStockDividendOfA(code string) {
 
 func (crawler *WMCrawler) updateStockCommonInfo(stockCommonInfo *StockCommonInfo) {
 
-	has, _ := db.DbEngine().Where("code = ? ", stockCommonInfo.Code).Get(&StockCommonInfo{})
+	has, _ :=db.DbEngine().Where("code = ? ", stockCommonInfo.Code).Get(&StockCommonInfo{})
 	if has {
 		db.DbEngine().Where("code = ? ", stockCommonInfo.Code).Update(stockCommonInfo)
-	} else {
+	}else{
 		db.DbEngine().Insert(stockCommonInfo)
 	}
 }
 
-func (crawler *WMCrawler) updateStockInfo(code string, date string, stockInfo *db.StockInfo) {
+func (crawler *WMCrawler) updateStockInfo(code string,date string,stockInfo *db.StockInfo) {
 
-	has, _ := db.DbEngine().Where("code = ? and date = ?", code, date).Get(&db.StockInfo{})
+	has, _ :=db.DbEngine().Where("code = ? and date = ?", code,date).Get(&db.StockInfo{})
 	if has {
-		_, err := db.DbEngine().Where("code = ? and date = ?", code, date).Update(stockInfo)
+		_,err:=db.DbEngine().Where("code = ? and date = ?", code,date).Update(stockInfo)
 		if err != nil {
 			logrus.Error(err)
 		}
-	} else {
-		_, err := db.DbEngine().Insert(stockInfo)
+	}else{
+		_,err:=db.DbEngine().Insert(stockInfo)
 		if err != nil {
 			logrus.Error(err)
 		}
 	}
 }
+
+
