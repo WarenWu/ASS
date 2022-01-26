@@ -2,32 +2,38 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
-	"github.com/go-resty/resty/v2"
-
-	//"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
+	"github.com/go-resty/resty/v2"
 	"github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
+
+	"ASS/utils"
 )
 
 func main4() {
+
+	// 禁用chrome headless
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", false),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
 	)
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancel()
+
+	// create chrome instance
 	ctx, cancel := chromedp.NewContext(
 		allocCtx,
 		chromedp.WithLogf(logrus.Printf),
 	)
 	defer cancel()
 
-	var hexinV string                                    //问财网cookie
-	const expr = `delete navigator.__proto__.webdriver;` //绕过爬虫检测
+	var hexinV string
+	const expr = `delete navigator.__proto__.webdriver;`
 
 	err := chromedp.Run(ctx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
@@ -39,6 +45,13 @@ func main4() {
 			return nil
 		}),
 		chromedp.Navigate(`http://www.iwencai.com/unifiedwap/home/index`),
+		// wait for footer element is visible (ie, page is loaded)
+		//chromedp.WaitVisible(`.search-icon.base-icon.pointer`, chromedp.ByQuery),
+		//chromedp.Click(`textarea.search-input`, chromedp.ByQuery), // find and click "Expand All"
+		//chromedp.Sleep(1*time.Second),
+		//chromedp.SendKeys(`.search-input`, `茅台`, chromedp.ByQuery),
+		//chromedp.Sleep(5*time.Second),
+
 		chromedp.Sleep(1*time.Second),
 		//chromedp.Evaluate(`document.cookie`, &hexinV),
 		chromedp.ActionFunc(func(ctx context.Context) error {
@@ -63,8 +76,8 @@ func main4() {
 
 	client := resty.New()
 
-	_, err = client.R().SetFormData(map[string]string{
-		"question":         "连续 10 年 ROE 大于 15%，连续 5 年净利润现金含量大于 80%，连续 5 年毛利率大于 30%，10 年资产负债率，分红",
+	resp, err := client.R().SetFormData(map[string]string{
+		"question":         "连续 10 年 ROE 大于 15%， 连续 5 年净利润现金含量大于 80% ，连续 5 年毛利率大于 30%",
 		"perpage":          "1000",
 		"page":             "1",
 		"secondary_intent": "",
@@ -86,32 +99,32 @@ func main4() {
 		logrus.Error(err)
 		return
 	}
-}
-func main5() {
 
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", false),
-		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
-	)
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancel()
+	jsonResp, err := utils.UnescapeUnicode(resp.Body())
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
 
-	// create chrome instance
-	ctx, cancel := chromedp.NewContext(
-		allocCtx,
-		chromedp.WithLogf(logrus.Printf),
-	)
-	defer cancel()
+	logrus.Trace(jsonResp)
 
-	const expr = `delete navigator.__proto__.webdriver;` //绕过爬虫检测
+	datasJson := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.0.data.datas")
+	test1 := datasJson.Value()
+	logrus.Print(test1)
 
-	var bt string
-	const bonus_expr = `
-	var bt = document.querySelector('#fvaluep').innerText;
+	for _, name := range datasJson.Array() {
+		data := name.Value().(map[string]interface{})
+		fmt.Printf("%s",data["code"])
+	}
 
-	document.cookie = "bt=aaa"+bt;
-	`
-	err := chromedp.Run(ctx,
+	datas := make([]map[string]interface{}, 0)
+
+	//err = json.Unmarshal([]byte(datasJson), &datas)
+
+	logrus.Traceln(datas, len(datas))
+
+	var text string
+	err = chromedp.Run(ctx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
 			if err != nil {
@@ -120,25 +133,12 @@ func main5() {
 			}
 			return nil
 		}),
-		chromedp.Navigate(`http://stockpage.10jqka.com.cn/600519`),
+		//chromedp.Navigate(`http://stockpage.10jqka.com.cn/realHead_v2.html#hs_` + "600519"),
+		chromedp.Navigate(`http://stockpage.10jqka.com.cn/600519/bonus/#bonuslist`),
 		//chromedp.WaitVisible(`#fvaluep`, chromedp.ByID),
-		chromedp.Sleep(1*time.Second),
-		chromedp.Evaluate(bonus_expr, &bt),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			cookies, err := network.GetAllCookies().Do(ctx)
-			if err != nil {
-				logrus.Error(err)
-				return err
-			}
-
-			for i, cookie := range cookies {
-				if cookie.Name == "bt" {
-					bt = cookie.Value
-				}
-				logrus.Trace("chrome cookie %d: %+v", i, cookie)
-			}
-			return nil
-		}),
+		chromedp.Evaluate(`bt = function getBt(){
+            return document.getElementById('dataifm').contentWindow.document.querySelector('#bonus_table>tbody').children[1].children[9].innerText;
+        }();   `, &text),
 	)
 	if err != nil {
 		logrus.Error(err)
@@ -147,6 +147,7 @@ func main5() {
 }
 
 func main()  {
+	// 禁用chrome headless
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", false),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
@@ -161,7 +162,7 @@ func main()  {
 	)
 	defer cancel()
 
-	const expr = `delete navigator.__proto__.webdriver;` //绕过爬虫检测
+	const expr = `delete navigator.__proto__.webdriver;`
 
 	var text string
 	err := chromedp.Run(ctx,
@@ -173,15 +174,13 @@ func main()  {
 			}
 			return nil
 		}),
-		chromedp.Navigate(`http://stockpage.10jqka.com.cn/600519`),
-		chromedp.WaitVisible(`new_detail`),
-		//chromedp.Text(`#fvaluep`, &text),
-		chromedp.Evaluate(`document.querySelector('#fvaluep').innerText;`, &text),
+		//chromedp.Navigate(`http://stockpage.10jqka.com.cn/realHead_v2.html#hs_` + "600519"),
+		chromedp.Navigate(`http://stockpage.10jqka.com.cn/600519/bonus/#bonuslist`),
+		//chromedp.WaitVisible(`#fvaluep`, chromedp.ByID),
+		chromedp.Evaluate(`bt = function getBt(){
+            return document.getElementById('dataifm').contentWindow.document.querySelector('#bonus_table>tbody').children[1].children[9].innerText;
+        }();   `, &text),
 	)
-	if err != nil {
-		logrus.Error(err)
-		return
-	}
 	if err != nil {
 		logrus.Error(err)
 		return

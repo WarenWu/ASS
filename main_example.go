@@ -26,7 +26,7 @@ func writeHTML(content string) http.Handler {
 	})
 }
 
-func main3() {
+func main1() {
 	ctx, cancel := chromedp.NewContext(context.Background())
 	defer cancel()
 
@@ -122,7 +122,7 @@ func main2() {
 	logrus.Trace(datas)
 }
 
-func main1() {
+func main3() {
 	body, _ := utils.Request(utils.GET, "http://www.iwencai.com/unifiedwap/result", map[string]string{
 		"w": "连续 5 年的 ROE 大于 15%",
 	}, nil, nil)
