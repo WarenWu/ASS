@@ -1,0 +1,21 @@
+{
+    "ip": "0.0.0.0",
+    "port": "8080",
+    "version": "1.0.0",
+    "appname": "ass",
+    "debug": false,
+    "crawltimeout":60,
+    "headless":true,
+    "log": {
+        "file": "./ass.log",
+        "level": "debug",
+        "maxage": 72,
+        "rotationtime": 600
+    },
+    "mysql": {
+        "user": "root",
+        "password": "123456",
+        "addr": "127.0.0.1:3306",
+        "db":"ass_vm"
+    }
+}
