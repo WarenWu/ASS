@@ -5,7 +5,7 @@
     "appname": "ass",
     "debug": false,
     "crawltimeout":60,
-    "headless":true,
+    "headless":false,
     "log": {
         "file": "./ass.log",
         "level": "debug",

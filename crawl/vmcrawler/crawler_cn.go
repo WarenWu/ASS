@@ -33,9 +33,9 @@ func (crawler *WMCrawlerCN) GetFilter(filter crawl.Filter) crawl.Filter {
 
 func (crawler *WMCrawlerCN) filter(filter crawl.Filter) []string {
 	options := make([]string, 0)
-	if filter != nil{
-		options = append(options,filter()...)
-	}	
+	if filter != nil {
+		options = append(options, filter()...)
+	}
 	options = append(options,
 		crawl.PE,
 		crawl.PRICE,
@@ -47,7 +47,6 @@ func (crawler *WMCrawlerCN) filter(filter crawl.Filter) []string {
 		crawl.INTEREST_RATIO)
 	return options
 }
-
 
 func (crawler *WMCrawlerCN) GetStockCodes() []string {
 	stocks := make([]string, 0)
@@ -251,7 +250,7 @@ func (crawler *WMCrawlerCN) CrawlFromIndex(condition string) string {
 			return nil
 		}),
 		chromedp.Navigate(`http://www.iwencai.com/unifiedwap/home/index`),
-		chromedp.Sleep(1*time.Second),
+		chromedp.WaitVisible(`.top-operate`, chromedp.ByQuery),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			cookies, err := network.GetAllCookies().Do(ctx)
 			if err != nil {
@@ -466,17 +465,35 @@ func (crawler *WMCrawlerCN) crawlStockPrice(code string) {
 }
 
 func (crawler *WMCrawlerCN) crawlStockROE(code string) {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Println("***" + code + "***")
+			logrus.Println(err)
+		}
+	}()
 	condition := code + ` 连续 ` + strconv.Itoa(crawler.Duration) + ` 年 ROE`
 	jsonResp := crawler.CrawlFromIndex(condition)
 	if jsonResp == "" {
 		return
 	}
-
 	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.1.data.datas")
 	for _, data := range datasObject.Array() {
 		dataInfo := data.Value().(map[string]interface{})
-		roe := strconv.FormatFloat(dataInfo["ROE"].(float64), 'f', 12, 64)
-		period := (strconv.FormatFloat(dataInfo["时间区间"].(float64), 'f', 12, 64))[0:4]
+		var roe string
+		var period string
+		if v, ok := dataInfo["ROE"]; ok {
+			roe = strconv.FormatFloat(v.(float64), 'f', 12, 64)[:6]
+		} else {
+			logrus.Infoln("***" + code + "***")
+			continue
+		}
+		if v, ok := dataInfo["时间区间"]; ok {
+			period = (strconv.FormatFloat(v.(float64), 'f', 12, 64))[0:4]
+		} else {
+			logrus.Infoln("***" + code + "***")
+			continue
+		}
+
 		stockInfo := db.StockInfo{
 			Code:   code,
 			Period: period,
@@ -490,17 +507,36 @@ func (crawler *WMCrawlerCN) crawlStockROE(code string) {
 }
 
 func (crawler *WMCrawlerCN) crawlStockCashRatio(code string) {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Println("***" + code + "***")
+			logrus.Println(err)
+		}
+	}()
 	condition := code + ` 连续 ` + strconv.Itoa(crawler.Duration) + ` 年 净利润现金含量`
 	jsonResp := crawler.CrawlFromIndex(condition)
 	if jsonResp == "" {
 		return
 	}
-
-	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.1.data.datas")
+	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.0.data.datas")
 	for _, data := range datasObject.Array() {
 		dataInfo := data.Value().(map[string]interface{})
-		cashRatio := strconv.FormatFloat(dataInfo["净利润现金含量占比"].(float64), 'f', 12, 64)
-		period := dataInfo["时间"].(string)[0:4]
+		var cashRatio string
+		var period string
+		if v, ok := dataInfo["净利润现金含量占比"]; ok {
+			cashRatio = strconv.FormatFloat(v.(float64), 'f', 12, 64)[:6]
+		} else {
+			logrus.Infoln("***" + code + "***")
+			continue
+		}
+		if v, ok := dataInfo["时间区间"]; ok {
+			data := v.(string)
+			period = "20" + data[0:2]
+		} else {
+			logrus.Infoln("***" + code + "***")
+			continue
+		}
+
 		stockInfo := db.StockInfo{
 			Code:      code,
 			Period:    period,
@@ -523,8 +559,22 @@ func (crawler *WMCrawlerCN) crawlStockAssetLiabilityRatio(code string) {
 	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.0.data.datas")
 	for _, data := range datasObject.Array() {
 		dataInfo := data.Value().(map[string]interface{})
-		assetLiabilityRatio := strconv.FormatFloat(dataInfo["资产负债率(%)"].(float64), 'f', 12, 64)
-		period := (strconv.FormatFloat(dataInfo["时间区间"].(float64), 'f', 12, 64))[0:4]
+
+		var assetLiabilityRatio string
+		var period string
+		if v, ok := dataInfo["资产负债率(%)"]; ok {
+			assetLiabilityRatio = strconv.FormatFloat(v.(float64), 'f', 12, 64)[:6]
+		} else {
+			logrus.Infoln("***" + code + "***")
+			continue
+		}
+		if v, ok := dataInfo["时间区间"]; ok {
+			period = (strconv.FormatFloat(v.(float64), 'f', 12, 64))[0:4]
+		} else {
+			logrus.Infoln("***" + code + "***")
+			continue
+		}
+
 		stockInfo := db.StockInfo{
 			Code:                code,
 			Period:              period,
@@ -547,9 +597,21 @@ func (crawler *WMCrawlerCN) crawlStockGrossProfitRatio(code string) {
 	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.1.data.datas")
 	for _, data := range datasObject.Array() {
 		dataInfo := data.Value().(map[string]interface{})
-		grossProfitRatio := dataInfo["销售毛利率"].(string)
-		data := dataInfo["报告期"].(string)
-		period := "20" + data[0:2]
+		var grossProfitRatio string
+		var period string
+		if v, ok := dataInfo["销售毛利率"]; ok {
+			grossProfitRatio = v.(string)
+		} else {
+			logrus.Infoln("***" + code + "***")
+			continue
+		}
+		if v, ok := dataInfo["报告期"]; ok {
+			data := v.(string)
+			period = "20" + data[0:2]
+		} else {
+			logrus.Infoln("***" + code + "***")
+			continue
+		}
 
 		stockInfo := db.StockInfo{
 			Code:             code,
@@ -581,6 +643,33 @@ func (crawler *WMCrawlerCN) crawlStockDividendRatio(code string) {
 
 	const expr = `delete navigator.__proto__.webdriver;`
 	var drs string
+	js := `
+	bt = function getDR(){
+		let ret = "";
+		var trs
+		if (window.frames["CC"] == undefined)
+		{
+			trs = document.querySelector('#bonus_table>tbody').children;
+		}
+		else
+		{
+			trs = window.frames["CC"].document.querySelector('#bonus_table>tbody').children;
+		}
+		for (var i = 0; i < trs.length; i++) {
+			if (trs[i].className != "J_pageritem ")
+			{
+				continue;
+			}
+			t = trs[i].children[0].innerText.substr(0,4);
+			b = parseFloat(trs[i].children[9].innerText);
+			if(Object.is(b,NaN))
+			{
+				continue;
+			}
+			ret += t + "-"+ b + ":"; 
+		}
+		return ret
+	}()`
 	err := chromedp.Run(ctx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
@@ -590,26 +679,9 @@ func (crawler *WMCrawlerCN) crawlStockDividendRatio(code string) {
 			}
 			return nil
 		}),
-		chromedp.Navigate(`http://stockpage.10jqka.com.cn/`+code+`/bonus/#bonuslist`),
-		chromedp.Evaluate(`
-		bt = function getDR(){
-            let ret = "";
-            var trs = document.getElementById('dataifm').contentWindow.document.querySelector('#bonus_table>tbody').children;
-            for (var i = 0; i < trs.length; i++) {
-                if (trs[i].className != "J_pageritem ")
-                {
-                    continue;
-                }
-                t = trs[i].children[0].innerText.substr(0,4);
-                b = parseFloat(trs[i].children[9].innerText);
-                if(Object.is(b,NaN))
-                {
-                    continue;
-                }
-				ret += t + "-"+ b + ":"; 
-            }
-            return ret
-        }()`, &drs),
+		chromedp.Navigate(`http://basic.10jqka.com.cn/`+code+`/bonus.html`),
+		chromedp.Sleep(1000*time.Millisecond),
+		chromedp.Evaluate(js, &drs),
 	)
 	if err != nil {
 		logrus.Error(err)
@@ -652,6 +724,40 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 
 	const expr = `delete navigator.__proto__.webdriver;`
 	var irs string
+	js := `bt = function getIR(){
+		var price = ` + crawler.CommonInfos[code].Price + `
+		let ret = "";
+		var irs;
+		if (window.frames["CC"] == undefined)
+		{
+			irs = document.querySelector('#bonus_table>tbody').children;
+		}
+		else
+		{
+			irs = window.frames["CC"].document.querySelector('#bonus_table>tbody').children;
+		}
+		for (var i = 0; i < irs.length; i++) {
+			if (irs[i].className != "J_pageritem ")
+			{
+				continue;
+			}
+			t = irs[i].children[0].innerText.substr(0,4);
+			arr = irs[i].children[4].innerText.split("派");
+			if(arr.length != 2)
+			{
+				continue;
+			}
+			n = parseFloat(arr[0]);
+			b = parseFloat(arr[1]);
+			r = 100*b/(n*parseFloat(price))
+			if(Object.is(r,NaN))
+			{
+				r="0"
+			}
+			ret +=t + "-" + r + ":";  
+		}
+		return ret
+	}()`
 	err := chromedp.Run(ctx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
@@ -661,35 +767,9 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 			}
 			return nil
 		}),
-		chromedp.Navigate(`http://stockpage.10jqka.com.cn/`+code+`/bonus/#bonuslist`),
+		chromedp.Navigate(`http://basic.10jqka.com.cn/`+code+`/bonus.html`),
 		chromedp.Sleep(1000*time.Millisecond),
-		chromedp.Evaluate(`
-		bt = function getIR(){
-			var price = `+crawler.CommonInfos[code].Price+`
-            let ret = "";
-            var trs = document.getElementById('dataifm').contentWindow.document.querySelector('#bonus_table>tbody').children;
-            for (var i = 0; i < trs.length; i++) {
-                if (trs[i].className != "J_pageritem ")
-                {
-                    continue;
-                }
-                t = trs[i].children[0].innerText.substr(0,4);
-                arr = trs[i].children[4].innerText.split("派");
-				if(arr.length != 2)
-				{
-					continue;
-				}
-				n = parseFloat(arr[0]);
-				b = parseFloat(arr[1]);
-				r = 100*b/(n*parseFloat(price))
-				if(Object.is(r,NaN))
-                {
-                    r="0"
-                }
-                ret +=t + "-" + r + ":";  
-            }
-            return ret
-        }()`, &irs),
+		chromedp.Evaluate(js, &irs),
 	)
 	if err != nil {
 		logrus.Error(err)
@@ -701,7 +781,7 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 			continue
 		}
 		period := v[0]
-		interestRatio := v[1]
+		interestRatio := v[1][:6]
 		stockInfo := db.StockInfo{
 			Code:          code,
 			Period:        period,

@@ -2,7 +2,7 @@ package db
 
 type StockInfo struct {
 	Code                string `xorm:"code"`
-	Period                string `xorm:"period"`
+	Period              string `xorm:"period"`
 	Name                string `xorm:"name"`
 	Price               string `xorm:"price"`
 	PE                  string `xorm:"pe"`
