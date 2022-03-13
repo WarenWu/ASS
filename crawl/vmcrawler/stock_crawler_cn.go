@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chromedp/cdproto/network"
@@ -20,9 +21,68 @@ import (
 )
 
 type WMCrawlerCN struct {
-	FirstCondition string
-	Duration       int
-	CommonInfos    map[string]*db.StockCommonInfo
+	firstCondition string
+	duration       int
+	commonInfos    map[string]*db.StockCommonInfo
+	stockCodes     []string
+	stockCodesMtx  sync.Mutex
+	crawlTimeout   int
+	pe_sh          float64
+	pe_sz          float64
+	yield          float64
+	isRunning      bool
+}
+
+func NewCNCrawl(firstCondition string, duration int, crawlTimeout int) (c *WMCrawlerCN) {
+	c = &WMCrawlerCN{
+		firstCondition: firstCondition,
+		duration:       duration,
+		commonInfos:    make(map[string]*db.StockCommonInfo, 0),
+		stockCodes:     make([]string, 0),
+		crawlTimeout:   crawlTimeout,
+		pe_sh:          -1,
+		pe_sz:          -1,
+		yield:          -1,
+		isRunning:      false,
+	}
+	return
+}
+
+func (crawler *WMCrawlerCN) Start() {
+	crawler.isRunning = true
+	go func() {
+		logrus.Infoln("WMCrawlerCN start crawling...")
+		for crawler.isRunning {
+			crawler.crawlStockCodes()
+			crawler.crawlPE()
+			crawler.crawlYield()
+			crawler.crawlStockInfos(crawler.GetFilter(nil))
+			time.Sleep(time.Second * 600)
+		}
+		logrus.Infoln("WMCrawlerCN stop crawling...")
+	}()
+}
+
+func (crawler *WMCrawlerCN) Stop() {
+	crawler.isRunning = false
+}
+
+func (crawler *WMCrawlerCN) PutStockCode(stockCode string) {
+	crawler.stockCodesMtx.Lock()
+	crawler.stockCodes = append(crawler.stockCodes, stockCode)
+	crawler.stockCodesMtx.Unlock()
+}
+
+func (crawler *WMCrawlerCN) DelStockCode(stockCode string) {
+	crawler.stockCodesMtx.Lock()
+	j := 0
+	for _, v := range crawler.stockCodes {
+		if v != stockCode {
+			crawler.stockCodes[j] = v
+		}
+	}
+	crawler.stockCodes = crawler.stockCodes[:j]
+	crawler.stockCodesMtx.Unlock()
 }
 
 func (crawler *WMCrawlerCN) GetFilter(filter crawl.Filter) crawl.Filter {
@@ -49,45 +109,59 @@ func (crawler *WMCrawlerCN) filter(filter crawl.Filter) []string {
 }
 
 func (crawler *WMCrawlerCN) GetStockCodes() []string {
-	stocks := make([]string, 0)
-	jsonResp := crawler.CrawlFromIndex(crawler.FirstCondition)
+	crawler.stockCodesMtx.Lock()
+	stockCodes := make([]string, len(crawler.stockCodes))
+	copy(stockCodes, crawler.stockCodes)
+	crawler.stockCodesMtx.Unlock()
+	return stockCodes
+}
+
+func (crawler *WMCrawlerCN) crawlStockCodes() {
+	jsonResp := crawler.CrawlFromIndex(crawler.firstCondition)
 	if jsonResp == "" {
-		return nil
+		return
 	}
 	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.0.data.datas")
 	for _, data := range datasObject.Array() {
 		stockInfo := data.Value().(map[string]interface{})
-		stocks = append(stocks, stockInfo["code"].(string))
+		crawler.stockCodes = append(crawler.stockCodes, stockInfo["code"].(string))
 	}
-	return stocks
 }
 
-func (crawler *WMCrawlerCN) GetStockInfos(stockCodes []string, filter crawl.Filter) []map[string]string {
-	codes := stockCodes
-	if len(codes) == 0 {
-		codes = crawler.GetStockCodes()
-		if codes == nil {
-			return nil
-		}
-	}
-	stockInfos := make([]map[string]string, 0)
-	for _, code := range codes {
-		stockInfo := crawler.GetStockInfo(code, filter)
-		stockInfos = append(stockInfos, stockInfo...)
-	}
+func (crawler *WMCrawlerCN) GetStockInfos(filter crawl.Filter) []map[string]string {
+
+	stockInfos := make([]map[string]string, crawler.duration)
+	//从数据库读出来
 	return stockInfos
+}
+
+func (crawler *WMCrawlerCN) crawlStockInfos(filter crawl.Filter) {
+	stockCodes := crawler.GetStockCodes()
+	for _, code := range stockCodes {
+		// go func(code string) {
+		// 	crawler.crawlStockInfo(code, filter)
+		// }(code)
+		crawler.crawlStockInfo(code, filter)
+	}
 }
 
 func (crawler *WMCrawlerCN) GetStockInfo(stockCode string, filter crawl.Filter) []map[string]string {
 	if stockCode == "" {
 		return nil
 	}
+	stockInfos := make([]map[string]string, crawler.duration)
+	//从数据库读出来
+	return stockInfos
+}
+
+func (crawler *WMCrawlerCN) crawlStockInfo(stockCode string, filter crawl.Filter) {
+	if stockCode == "" {
+		return
+	}
 	stockCommonInfo := &db.StockCommonInfo{Code: stockCode}
 	crawler.updateStockCommonInfo(stockCommonInfo)
 
 	flags := filter()
-	stockInfos := make([]map[string]string, crawler.Duration)
-
 	//更新数据库数据
 	crawler.crawlStockName(stockCode)
 	for _, flag := range flags {
@@ -110,17 +184,24 @@ func (crawler *WMCrawlerCN) GetStockInfo(stockCode string, filter crawl.Filter) 
 			crawler.crawlStockInterestRatio(stockCode)
 		}
 	}
-
-	//更新数据后从数据库读出来
-	return stockInfos
 }
 
-func (crawler *WMCrawlerCN) GetPE(t int) float64 {
+func (crawler *WMCrawlerCN) GetPE(t int) (pe float64) {
+	if t == crawl.SH_PE {
+		pe = crawler.pe_sh
+	}
+	if t == crawl.SZ_PE {
+		pe = crawler.pe_sz
+	}
+	return
+}
+
+func (crawler *WMCrawlerCN) crawlPE() {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
 	)
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.CrawlTimeout)*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(crawler.crawlTimeout)*time.Second)
 	defer cancel()
 	allocCtx, cancel := chromedp.NewExecAllocator(timeoutCtx, opts...)
 	defer cancel()
@@ -137,7 +218,7 @@ func (crawler *WMCrawlerCN) GetPE(t int) float64 {
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
 			if err != nil {
-				logrus.Error(err)
+				logrus.Errorln(err)
 				return err
 			}
 			return nil
@@ -151,39 +232,34 @@ func (crawler *WMCrawlerCN) GetPE(t int) float64 {
 		`, &text),
 	)
 	if err != nil {
-		logrus.Error(err)
-		return 0
+		logrus.Errorln(err)
+		return
 	}
 	pes := strings.Split(text, ":")
-	var sha float64 = 0
-	var sza float64 = 0
 	if len(pes) == 2 {
-		sha, err = strconv.ParseFloat(pes[0], 64)
+		crawler.pe_sh, err = strconv.ParseFloat(pes[0], 64)
 		if err != nil {
-			logrus.Error(err)
-			return 0
+			logrus.Errorln(err)
+			return
 		}
-		sza, err = strconv.ParseFloat(pes[1], 64)
+		crawler.pe_sz, err = strconv.ParseFloat(pes[1], 64)
 		if err != nil {
-			logrus.Error(err)
-			return 0
+			logrus.Errorln(err)
+			return
 		}
 	}
-	if t == crawl.SH_PE && err == nil {
-		return sha
-	}
-	if t == crawl.SZ_PE && err == nil {
-		return sza
-	}
-	return 0
 }
 
-func (crawler *WMCrawlerCN) GetYield(t int) float64 {
+func (crawler *WMCrawlerCN) GetYield() float64 {
+	return crawler.yield
+}
+
+func (crawler *WMCrawlerCN) crawlYield() {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
 	)
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.CrawlTimeout)*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(crawler.crawlTimeout)*time.Second)
 	defer cancel()
 	allocCtx, cancel := chromedp.NewExecAllocator(timeoutCtx, opts...)
 	defer cancel()
@@ -200,7 +276,7 @@ func (crawler *WMCrawlerCN) GetYield(t int) float64 {
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
 			if err != nil {
-				logrus.Error(err)
+				logrus.Errorln(err)
 				return err
 			}
 			return nil
@@ -212,15 +288,14 @@ func (crawler *WMCrawlerCN) GetYield(t int) float64 {
 		`, &text),
 	)
 	if err != nil {
-		logrus.Error(err)
-		return 0
+		logrus.Errorln(err)
+		return
 	}
-	yield, err := strconv.ParseFloat(text, 64)
+	crawler.yield, err = strconv.ParseFloat(text, 64)
 	if err != nil {
-		logrus.Error(err)
-		return 0
+		logrus.Errorln(err)
+		return
 	}
-	return yield
 }
 
 func (crawler *WMCrawlerCN) CrawlFromIndex(condition string) string {
@@ -228,7 +303,7 @@ func (crawler *WMCrawlerCN) CrawlFromIndex(condition string) string {
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
 	)
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.CrawlTimeout)*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(crawler.crawlTimeout)*time.Second)
 	defer cancel()
 	allocCtx, cancel := chromedp.NewExecAllocator(timeoutCtx, opts...)
 	defer cancel()
@@ -244,17 +319,16 @@ func (crawler *WMCrawlerCN) CrawlFromIndex(condition string) string {
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
 			if err != nil {
-				logrus.Error(err)
+				logrus.Errorln(err)
 				return err
 			}
 			return nil
 		}),
 		chromedp.Navigate(`http://www.iwencai.com/unifiedwap/home/index`),
-		chromedp.WaitVisible(`.top-operate`, chromedp.ByQuery),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			cookies, err := network.GetAllCookies().Do(ctx)
 			if err != nil {
-				logrus.Error(err)
+				logrus.Errorln(err)
 				return err
 			}
 
@@ -262,13 +336,13 @@ func (crawler *WMCrawlerCN) CrawlFromIndex(condition string) string {
 				if cookie.Name == "v" {
 					hexinV = cookie.Value
 				}
-				logrus.Trace("chrome cookie %d: %+v", i, cookie)
+				logrus.Tracef("chrome cookie %d: %+v\n", i, cookie)
 			}
 			return nil
 		}),
 	)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorln(err)
 		return ""
 	}
 	client := resty.New()
@@ -292,13 +366,13 @@ func (crawler *WMCrawlerCN) CrawlFromIndex(condition string) string {
 	}).Post("http://www.iwencai.com/unifiedwap/unified-wap/v2/result/get-robot-data")
 
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorln(err)
 		return ""
 	}
 
 	jsonResp, err := utils.UnescapeUnicode(resp.Body())
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorln(err)
 		return ""
 	}
 	return jsonResp
@@ -309,7 +383,7 @@ func (crawler *WMCrawlerCN) crawlStockPE(code string) {
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
 	)
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.CrawlTimeout)*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(crawler.crawlTimeout)*time.Second)
 	defer cancel()
 	allocCtx, cancel := chromedp.NewExecAllocator(timeoutCtx, opts...)
 	defer cancel()
@@ -326,7 +400,7 @@ func (crawler *WMCrawlerCN) crawlStockPE(code string) {
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
 			if err != nil {
-				logrus.Error(err)
+				logrus.Errorln(err)
 				return err
 			}
 			return nil
@@ -336,7 +410,7 @@ func (crawler *WMCrawlerCN) crawlStockPE(code string) {
 		chromedp.Evaluate(`document.getElementById('fvaluep').innerText`, &text),
 	)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorln(err)
 		return
 	}
 	stockCommonInfo := &db.StockCommonInfo{Code: code, PE: text}
@@ -349,11 +423,11 @@ func (crawler *WMCrawlerCN) crawlStockPE(code string) {
 		crawler.updateStockInfo(code, stockInfos[i].Period, &stockInfos[i])
 	}
 
-	_, ok := crawler.CommonInfos[code]
+	_, ok := crawler.commonInfos[code]
 	if ok {
-		crawler.CommonInfos[code].PE = text
+		crawler.commonInfos[code].PE = text
 	} else {
-		crawler.CommonInfos[code] = stockCommonInfo
+		crawler.commonInfos[code] = stockCommonInfo
 	}
 }
 
@@ -362,7 +436,7 @@ func (crawler *WMCrawlerCN) crawlStockName(code string) {
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
 	)
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.CrawlTimeout)*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(crawler.crawlTimeout)*time.Second)
 	defer cancel()
 	allocCtx, cancel := chromedp.NewExecAllocator(timeoutCtx, opts...)
 	defer cancel()
@@ -379,7 +453,7 @@ func (crawler *WMCrawlerCN) crawlStockName(code string) {
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
 			if err != nil {
-				logrus.Error(err)
+				logrus.Errorln(err)
 				return err
 			}
 			return nil
@@ -389,7 +463,7 @@ func (crawler *WMCrawlerCN) crawlStockName(code string) {
 		chromedp.Evaluate(`document.querySelector('#stockNamePlace').getAttribute('stockname');`, &text),
 	)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorln(err)
 		return
 	}
 	stockCommonInfo := &db.StockCommonInfo{Code: code, Name: text}
@@ -402,11 +476,11 @@ func (crawler *WMCrawlerCN) crawlStockName(code string) {
 		crawler.updateStockInfo(code, stockInfos[i].Period, &stockInfos[i])
 	}
 
-	_, ok := crawler.CommonInfos[code]
+	_, ok := crawler.commonInfos[code]
 	if ok {
-		crawler.CommonInfos[code].Name = text
+		crawler.commonInfos[code].Name = text
 	} else {
-		crawler.CommonInfos[code] = stockCommonInfo
+		crawler.commonInfos[code] = stockCommonInfo
 	}
 }
 
@@ -415,7 +489,7 @@ func (crawler *WMCrawlerCN) crawlStockPrice(code string) {
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
 	)
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.CrawlTimeout)*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(crawler.crawlTimeout)*time.Second)
 	defer cancel()
 	allocCtx, cancel := chromedp.NewExecAllocator(timeoutCtx, opts...)
 	defer cancel()
@@ -433,17 +507,18 @@ func (crawler *WMCrawlerCN) crawlStockPrice(code string) {
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
 			if err != nil {
-				logrus.Error(err)
+				logrus.Errorln(err)
 				return err
 			}
 			return nil
 		}),
 		chromedp.Navigate(`http://stockpage.10jqka.com.cn/realHead_v2.html#hs_`+code),
+		chromedp.WaitVisible(`#topenprice`, chromedp.ByID),
 		chromedp.Sleep(1000*time.Millisecond),
 		chromedp.Text(`#hexm_curPrice`, &text),
 	)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorln(err)
 		return
 	}
 	stockCommonInfo := &db.StockCommonInfo{Code: code, Price: text}
@@ -456,24 +531,19 @@ func (crawler *WMCrawlerCN) crawlStockPrice(code string) {
 		crawler.updateStockInfo(code, stockInfos[i].Period, &stockInfos[i])
 	}
 
-	_, ok := crawler.CommonInfos[code]
+	_, ok := crawler.commonInfos[code]
 	if ok {
-		crawler.CommonInfos[code].Price = text
+		crawler.commonInfos[code].Price = text
 	} else {
-		crawler.CommonInfos[code] = stockCommonInfo
+		crawler.commonInfos[code] = stockCommonInfo
 	}
 }
 
 func (crawler *WMCrawlerCN) crawlStockROE(code string) {
-	defer func() {
-		if err := recover(); err != nil {
-			logrus.Println("***" + code + "***")
-			logrus.Println(err)
-		}
-	}()
-	condition := code + ` 连续 ` + strconv.Itoa(crawler.Duration) + ` 年 ROE`
+	condition := code + ` 连续 ` + strconv.Itoa(crawler.duration) + ` 年 ROE`
 	jsonResp := crawler.CrawlFromIndex(condition)
 	if jsonResp == "" {
+		logrus.Errorln("***" + code + "***" + `爬取ROE失败`)
 		return
 	}
 	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.1.data.datas")
@@ -484,22 +554,22 @@ func (crawler *WMCrawlerCN) crawlStockROE(code string) {
 		if v, ok := dataInfo["ROE"]; ok {
 			roe = strconv.FormatFloat(v.(float64), 'f', 12, 64)[:6]
 		} else {
-			logrus.Infoln("***" + code + "***")
+			logrus.Warnln("***" + code + "***")
 			continue
 		}
 		if v, ok := dataInfo["时间区间"]; ok {
 			period = (strconv.FormatFloat(v.(float64), 'f', 12, 64))[0:4]
 		} else {
-			logrus.Infoln("***" + code + "***")
+			logrus.Warnln("***" + code + "***")
 			continue
 		}
 
 		stockInfo := db.StockInfo{
 			Code:   code,
 			Period: period,
-			Name:   crawler.CommonInfos[code].Name,
-			PE:     crawler.CommonInfos[code].PE,
-			Price:  crawler.CommonInfos[code].Price,
+			Name:   crawler.commonInfos[code].Name,
+			PE:     crawler.commonInfos[code].PE,
+			Price:  crawler.commonInfos[code].Price,
 			ROE:    roe,
 		}
 		crawler.updateStockInfo(code, period, &stockInfo)
@@ -507,15 +577,10 @@ func (crawler *WMCrawlerCN) crawlStockROE(code string) {
 }
 
 func (crawler *WMCrawlerCN) crawlStockCashRatio(code string) {
-	defer func() {
-		if err := recover(); err != nil {
-			logrus.Println("***" + code + "***")
-			logrus.Println(err)
-		}
-	}()
-	condition := code + ` 连续 ` + strconv.Itoa(crawler.Duration) + ` 年 净利润现金含量`
+	condition := code + ` 连续 ` + strconv.Itoa(crawler.duration) + ` 年 净利润现金含量`
 	jsonResp := crawler.CrawlFromIndex(condition)
 	if jsonResp == "" {
+		logrus.Errorln("***" + code + "***" + `爬取现金含量失败`)
 		return
 	}
 	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.0.data.datas")
@@ -526,33 +591,35 @@ func (crawler *WMCrawlerCN) crawlStockCashRatio(code string) {
 		if v, ok := dataInfo["净利润现金含量占比"]; ok {
 			cashRatio = strconv.FormatFloat(v.(float64), 'f', 12, 64)[:6]
 		} else {
-			logrus.Infoln("***" + code + "***")
+			logrus.Warnln("***" + code + "***")
 			continue
 		}
 		if v, ok := dataInfo["时间区间"]; ok {
 			data := v.(string)
 			period = "20" + data[0:2]
 		} else {
-			logrus.Infoln("***" + code + "***")
+			logrus.Warnln("***" + code + "***")
 			continue
 		}
 
 		stockInfo := db.StockInfo{
 			Code:      code,
 			Period:    period,
-			Name:      crawler.CommonInfos[code].Name,
-			PE:        crawler.CommonInfos[code].PE,
-			Price:     crawler.CommonInfos[code].Price,
+			Name:      crawler.commonInfos[code].Name,
+			PE:        crawler.commonInfos[code].PE,
+			Price:     crawler.commonInfos[code].Price,
 			CashRatio: cashRatio,
 		}
+		//logrus.Infoln(`---------------------------` + code + `:` + cashRatio + `---------------------------------`)
 		crawler.updateStockInfo(code, period, &stockInfo)
 	}
 }
 
 func (crawler *WMCrawlerCN) crawlStockAssetLiabilityRatio(code string) {
-	condition := code + ` 连续 ` + strconv.Itoa(crawler.Duration) + ` 年 资产负债率`
+	condition := code + ` 连续 ` + strconv.Itoa(crawler.duration) + ` 年 资产负债率`
 	jsonResp := crawler.CrawlFromIndex(condition)
 	if jsonResp == "" {
+		logrus.Errorln("***" + code + "***" + `爬取资产负债率失败`)
 		return
 	}
 
@@ -565,22 +632,22 @@ func (crawler *WMCrawlerCN) crawlStockAssetLiabilityRatio(code string) {
 		if v, ok := dataInfo["资产负债率(%)"]; ok {
 			assetLiabilityRatio = strconv.FormatFloat(v.(float64), 'f', 12, 64)[:6]
 		} else {
-			logrus.Infoln("***" + code + "***")
+			logrus.Warnln("***" + code + "***")
 			continue
 		}
 		if v, ok := dataInfo["时间区间"]; ok {
 			period = (strconv.FormatFloat(v.(float64), 'f', 12, 64))[0:4]
 		} else {
-			logrus.Infoln("***" + code + "***")
+			logrus.Warnln("***" + code + "***")
 			continue
 		}
 
 		stockInfo := db.StockInfo{
 			Code:                code,
 			Period:              period,
-			Name:                crawler.CommonInfos[code].Name,
-			PE:                  crawler.CommonInfos[code].PE,
-			Price:               crawler.CommonInfos[code].Price,
+			Name:                crawler.commonInfos[code].Name,
+			PE:                  crawler.commonInfos[code].PE,
+			Price:               crawler.commonInfos[code].Price,
 			AssetLiabilityRatio: assetLiabilityRatio,
 		}
 		crawler.updateStockInfo(code, period, &stockInfo)
@@ -588,9 +655,10 @@ func (crawler *WMCrawlerCN) crawlStockAssetLiabilityRatio(code string) {
 }
 
 func (crawler *WMCrawlerCN) crawlStockGrossProfitRatio(code string) {
-	condition := code + ` 连续 ` + strconv.Itoa(crawler.Duration) + ` 年 毛利率`
+	condition := code + ` 连续 ` + strconv.Itoa(crawler.duration) + ` 年 毛利率`
 	jsonResp := crawler.CrawlFromIndex(condition)
 	if jsonResp == "" {
+		logrus.Errorln("***" + code + "***" + `爬取毛利率失败`)
 		return
 	}
 
@@ -602,23 +670,23 @@ func (crawler *WMCrawlerCN) crawlStockGrossProfitRatio(code string) {
 		if v, ok := dataInfo["销售毛利率"]; ok {
 			grossProfitRatio = v.(string)
 		} else {
-			logrus.Infoln("***" + code + "***")
+			logrus.Warnln("***" + code + "***")
 			continue
 		}
 		if v, ok := dataInfo["报告期"]; ok {
 			data := v.(string)
 			period = "20" + data[0:2]
 		} else {
-			logrus.Infoln("***" + code + "***")
+			logrus.Warnln("***" + code + "***")
 			continue
 		}
 
 		stockInfo := db.StockInfo{
 			Code:             code,
 			Period:           period,
-			Name:             crawler.CommonInfos[code].Name,
-			PE:               crawler.CommonInfos[code].PE,
-			Price:            crawler.CommonInfos[code].Price,
+			Name:             crawler.commonInfos[code].Name,
+			PE:               crawler.commonInfos[code].PE,
+			Price:            crawler.commonInfos[code].Price,
 			GrossProfitRatio: grossProfitRatio,
 		}
 		crawler.updateStockInfo(code, period, &stockInfo)
@@ -630,7 +698,7 @@ func (crawler *WMCrawlerCN) crawlStockDividendRatio(code string) {
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
 	)
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.CrawlTimeout)*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(crawler.crawlTimeout)*time.Second)
 	defer cancel()
 	allocCtx, cancel := chromedp.NewExecAllocator(timeoutCtx, opts...)
 	defer cancel()
@@ -674,7 +742,7 @@ func (crawler *WMCrawlerCN) crawlStockDividendRatio(code string) {
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
 			if err != nil {
-				logrus.Error(err)
+				logrus.Errorln(err)
 				return err
 			}
 			return nil
@@ -684,7 +752,7 @@ func (crawler *WMCrawlerCN) crawlStockDividendRatio(code string) {
 		chromedp.Evaluate(js, &drs),
 	)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorln(err)
 		return
 	}
 	for _, dr := range strings.Split(drs, ":") {
@@ -697,9 +765,9 @@ func (crawler *WMCrawlerCN) crawlStockDividendRatio(code string) {
 		stockInfo := db.StockInfo{
 			Code:          code,
 			Period:        period,
-			Name:          crawler.CommonInfos[code].Name,
-			PE:            crawler.CommonInfos[code].PE,
-			Price:         crawler.CommonInfos[code].Price,
+			Name:          crawler.commonInfos[code].Name,
+			PE:            crawler.commonInfos[code].PE,
+			Price:         crawler.commonInfos[code].Price,
 			DividendRatio: dividendRatio,
 		}
 		crawler.updateStockInfo(code, period, &stockInfo)
@@ -711,7 +779,7 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
 	)
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.CrawlTimeout)*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(crawler.crawlTimeout)*time.Second)
 	defer cancel()
 	allocCtx, cancel := chromedp.NewExecAllocator(timeoutCtx, opts...)
 	defer cancel()
@@ -725,7 +793,7 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 	const expr = `delete navigator.__proto__.webdriver;`
 	var irs string
 	js := `bt = function getIR(){
-		var price = ` + crawler.CommonInfos[code].Price + `
+		var price = ` + crawler.commonInfos[code].Price + `
 		let ret = "";
 		var irs;
 		if (window.frames["CC"] == undefined)
@@ -762,7 +830,7 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
 			if err != nil {
-				logrus.Error(err)
+				logrus.Errorln(err)
 				return err
 			}
 			return nil
@@ -772,7 +840,7 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 		chromedp.Evaluate(js, &irs),
 	)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorln(err)
 		return
 	}
 	for _, ir := range strings.Split(irs, ":") {
@@ -785,9 +853,9 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 		stockInfo := db.StockInfo{
 			Code:          code,
 			Period:        period,
-			Name:          crawler.CommonInfos[code].Name,
-			PE:            crawler.CommonInfos[code].PE,
-			Price:         crawler.CommonInfos[code].Price,
+			Name:          crawler.commonInfos[code].Name,
+			PE:            crawler.commonInfos[code].PE,
+			Price:         crawler.commonInfos[code].Price,
 			InterestRatio: interestRatio,
 		}
 		crawler.updateStockInfo(code, period, &stockInfo)
@@ -810,12 +878,12 @@ func (crawler *WMCrawlerCN) updateStockInfo(code string, period string, stockInf
 	if has {
 		_, err := db.DbEngine().Where("code = ? and period = ?", code, period).Update(stockInfo)
 		if err != nil {
-			logrus.Error(err)
+			logrus.Errorln(err)
 		}
 	} else {
 		_, err := db.DbEngine().Insert(stockInfo)
 		if err != nil {
-			logrus.Error(err)
+			logrus.Errorln(err)
 		}
 	}
 }

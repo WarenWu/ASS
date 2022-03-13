@@ -3,8 +3,8 @@ module ASS
 go 1.16
 
 require (
-	github.com/chromedp/cdproto v0.0.0-20220124012806-175728ec2004
-	github.com/chromedp/chromedp v0.7.6
+	github.com/chromedp/cdproto v0.0.0-20220310232215-0e2f46551646
+	github.com/chromedp/chromedp v0.7.8
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/go-sql-driver/mysql v1.6.0
@@ -13,6 +13,6 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
-	github.com/tidwall/gjson v1.13.0
+	github.com/tidwall/gjson v1.14.0
 	xorm.io/xorm v1.2.5
 )

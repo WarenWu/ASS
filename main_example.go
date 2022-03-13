@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -22,7 +21,6 @@ import (
 	"github.com/tidwall/gjson"
 
 	"ASS/config"
-	"ASS/crawl"
 	crawler "ASS/crawl/vmcrawler"
 	"ASS/db"
 	"ASS/utils"
@@ -365,32 +363,15 @@ func main() {
 	config.InitConfig()
 	config.InitLog()
 	db.InitDatabse()
-	c := crawler.WMCrawlerCN{
-		FirstCondition: `连续 5 年 ROE 大于 20%，连续 5 年净利润现金含量大于 80%，连续 5 年毛利率大于 30%，上市大于三年`,
-		Duration:       5,
-		CommonInfos:    make(map[string]*db.StockCommonInfo, 0),
-	}
+	c := crawler.NewCNCrawl(
+		`连续 5 年 ROE 大于 20%，连续 5 年净利润现金含量大于 80%，连续 5 年毛利率大于 30%，上市大于三年`,
+		10,
+		config.CrawlTimeout,
+	)
+
 	start := time.Now().Unix()
-	//c.GetStockInfo("300760", c.GetFilter(nil))
-
-	var wg sync.WaitGroup
-	codes := c.GetStockCodes()
-	for _, code := range codes {
-		wg.Add(1)
-		go func (code string)  {
-			c.GetStockInfo(code, c.GetFilter(nil))
-			wg.Done()
-		}(code)		
-	}
-	wg.Wait()
-	//c.GetStockInfos(nil, c.GetFilter(nil))
-
-	ret := c.GetPE(crawl.SZ_PE)
-	logrus.Println("A股市盈率:", ret)
-
-	ret = c.GetYield(crawl.CN_YIELD)
-	logrus.Println("国债率:", ret)
-
+	c.Start()
+	time.Sleep(600*time.Second)
 	duration := time.Now().Unix() - start
 	logrus.Println("总耗时:", duration)
 

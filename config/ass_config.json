@@ -4,8 +4,8 @@
     "version": "1.0.0",
     "appname": "ass",
     "debug": false,
-    "crawltimeout":60,
-    "headless":false,
+    "crawltimeout":300,
+    "headless":true,
     "log": {
         "file": "./ass.log",
         "level": "debug",
