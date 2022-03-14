@@ -11,6 +11,7 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/go-resty/resty/v2"
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
@@ -31,6 +32,10 @@ type WMCrawlerCN struct {
 	pe_sz          float64
 	yield          float64
 	isRunning      bool
+}
+
+type StockInfos struct {
+	data []db.StockInfo `json:"datas"`
 }
 
 func NewCNCrawl(firstCondition string, duration int, crawlTimeout int) (c *WMCrawlerCN) {
@@ -56,7 +61,7 @@ func (crawler *WMCrawlerCN) Start() {
 			crawler.crawlStockCodes()
 			crawler.crawlPE()
 			crawler.crawlYield()
-			crawler.crawlStockInfos(crawler.GetFilter(nil))
+			crawler.crawlStockInfos()
 			time.Sleep(time.Second * 600)
 		}
 		logrus.Infoln("WMCrawlerCN stop crawling...")
@@ -83,12 +88,6 @@ func (crawler *WMCrawlerCN) DelStockCode(stockCode string) {
 	}
 	crawler.stockCodes = crawler.stockCodes[:j]
 	crawler.stockCodesMtx.Unlock()
-}
-
-func (crawler *WMCrawlerCN) GetFilter(filter crawl.Filter) crawl.Filter {
-	return func() []string {
-		return crawler.filter(filter)
-	}
 }
 
 func (crawler *WMCrawlerCN) filter(filter crawl.Filter) []string {
@@ -128,40 +127,62 @@ func (crawler *WMCrawlerCN) crawlStockCodes() {
 	}
 }
 
-func (crawler *WMCrawlerCN) GetStockInfos(filter crawl.Filter) []map[string]string {
+func (crawler *WMCrawlerCN) GetStockInfos(filter crawl.Filter) string {
 
-	stockInfos := make([]map[string]string, crawler.duration)
-	//从数据库读出来
-	return stockInfos
+	stockInfos := StockInfos{
+		data: make([]db.StockInfo, 0),
+	}
+	err := db.DbEngine().Find(&stockInfos.data)
+	if err != nil {
+		logrus.Errorln(err)
+		return ""
+	}
+	datas, err := json.Marshal(stockInfos)
+	if err != nil {
+		logrus.Errorln(err)
+		return ""
+	}
+	return string(datas)
 }
 
-func (crawler *WMCrawlerCN) crawlStockInfos(filter crawl.Filter) {
+func (crawler *WMCrawlerCN) crawlStockInfos() {
 	stockCodes := crawler.GetStockCodes()
 	for _, code := range stockCodes {
 		// go func(code string) {
 		// 	crawler.crawlStockInfo(code, filter)
 		// }(code)
-		crawler.crawlStockInfo(code, filter)
+		crawler.crawlStockInfo(code)
 	}
 }
 
-func (crawler *WMCrawlerCN) GetStockInfo(stockCode string, filter crawl.Filter) []map[string]string {
+func (crawler *WMCrawlerCN) GetStockInfo(stockCode string, filter crawl.Filter) string {
 	if stockCode == "" {
-		return nil
+		return ""
 	}
-	stockInfos := make([]map[string]string, crawler.duration)
-	//从数据库读出来
-	return stockInfos
+	stockInfos := StockInfos{
+		data: make([]db.StockInfo, 0),
+	}
+	err := db.DbEngine().Where("code = ?", stockCode).Find(&stockInfos.data)
+	if err != nil {
+		logrus.Errorln(err)
+		return ""
+	}
+	datas, err := json.Marshal(stockInfos)
+	if err != nil {
+		logrus.Errorln(err)
+		return ""
+	}
+	return string(datas)
 }
 
-func (crawler *WMCrawlerCN) crawlStockInfo(stockCode string, filter crawl.Filter) {
+func (crawler *WMCrawlerCN) crawlStockInfo(stockCode string) {
 	if stockCode == "" {
 		return
 	}
 	stockCommonInfo := &db.StockCommonInfo{Code: stockCode}
 	crawler.updateStockCommonInfo(stockCommonInfo)
 
-	flags := filter()
+	flags := crawler.filter(nil)
 	//更新数据库数据
 	crawler.crawlStockName(stockCode)
 	for _, flag := range flags {
@@ -325,6 +346,7 @@ func (crawler *WMCrawlerCN) CrawlFromIndex(condition string) string {
 			return nil
 		}),
 		chromedp.Navigate(`http://www.iwencai.com/unifiedwap/home/index`),
+		chromedp.Sleep(1000*time.Millisecond),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			cookies, err := network.GetAllCookies().Do(ctx)
 			if err != nil {

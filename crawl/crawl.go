@@ -29,14 +29,13 @@ type SellJudge func() bool  //判断卖出时机
 type StockCrawler interface {
 	Start()
 	Stop()
-	PutStockCode(string)                             //向爬取池增加自定义股票
-	DelStockCode(string)                             //向爬取池删除自定义股票
-	GetFilter(filter Filter) Filter                  //添加默认信息项
-	GetStockCodes() []string                         //返回爬取池所有股票
-	GetStockInfo(string, Filter) []map[string]string //指定股票代码和筛选器，获取股票信息
-	GetStockInfos(Filter) []map[string]string        //指定筛选器，获取所有股票池爬取的信息
-	GetPE(int) float64                               //爬取市盈率
-	GetYield() float64                           	 //爬取整体收益率（国债）
+	PutStockCode(string)        //向爬取池增加自定义股票
+	DelStockCode(string)        //向爬取池删除自定义股票
+	GetStockCodes() []string    //返回爬取池所有股票
+	GetStockInfo(string) string //指定股票，获取股票json信息
+	GetStockInfos() string      //获取所有股票json信息
+	GetPE(int) float64          //爬取市盈率
+	GetYield() float64          //爬取整体收益率（国债）
 }
 
 //买入卖出接口，返回是否可以买入或卖出
