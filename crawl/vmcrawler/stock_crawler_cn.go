@@ -2,6 +2,8 @@ package wmcrawler
 
 import (
 	"context"
+	"encoding/json"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,6 +15,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+	"gorm.io/gorm"
 
 	"ASS/config"
 	"ASS/crawl"
@@ -31,6 +34,10 @@ type WMCrawlerCN struct {
 	pe_sz          float64
 	yield          float64
 	isRunning      bool
+}
+
+type StockInfos struct {
+	Data []db.StockInfo `json:"datas"`
 }
 
 func NewCNCrawl(firstCondition string, duration int, crawlTimeout int) (c *WMCrawlerCN) {
@@ -56,8 +63,8 @@ func (crawler *WMCrawlerCN) Start() {
 			crawler.crawlStockCodes()
 			crawler.crawlPE()
 			crawler.crawlYield()
-			crawler.crawlStockInfos(crawler.GetFilter(nil))
-			time.Sleep(time.Second * 600)
+			crawler.crawlStockInfos()
+			time.Sleep(time.Second * 10 * 60)
 		}
 		logrus.Infoln("WMCrawlerCN stop crawling...")
 	}()
@@ -83,12 +90,6 @@ func (crawler *WMCrawlerCN) DelStockCode(stockCode string) {
 	}
 	crawler.stockCodes = crawler.stockCodes[:j]
 	crawler.stockCodesMtx.Unlock()
-}
-
-func (crawler *WMCrawlerCN) GetFilter(filter crawl.Filter) crawl.Filter {
-	return func() []string {
-		return crawler.filter(filter)
-	}
 }
 
 func (crawler *WMCrawlerCN) filter(filter crawl.Filter) []string {
@@ -128,40 +129,62 @@ func (crawler *WMCrawlerCN) crawlStockCodes() {
 	}
 }
 
-func (crawler *WMCrawlerCN) GetStockInfos(filter crawl.Filter) []map[string]string {
+func (crawler *WMCrawlerCN) GetStockInfos(filter crawl.Filter) string {
 
-	stockInfos := make([]map[string]string, crawler.duration)
-	//从数据库读出来
-	return stockInfos
+	stockInfos := StockInfos{
+		Data: make([]db.StockInfo, 0),
+	}
+	result := db.DbEngine().Find(&stockInfos.Data)
+	if result.Error != nil {
+		logrus.Errorln(result.Error)
+		return ""
+	}
+	datas, err := json.Marshal(stockInfos)
+	if err != nil {
+		logrus.Errorln(err)
+		return ""
+	}
+	return string(datas)
 }
 
-func (crawler *WMCrawlerCN) crawlStockInfos(filter crawl.Filter) {
+func (crawler *WMCrawlerCN) crawlStockInfos() {
 	stockCodes := crawler.GetStockCodes()
 	for _, code := range stockCodes {
-		// go func(code string) {
-		// 	crawler.crawlStockInfo(code, filter)
-		// }(code)
-		crawler.crawlStockInfo(code, filter)
+		go func(code string) {
+			crawler.crawlStockInfo(code)
+		}(code)
+		//crawler.crawlStockInfo(code)
 	}
 }
 
-func (crawler *WMCrawlerCN) GetStockInfo(stockCode string, filter crawl.Filter) []map[string]string {
+func (crawler *WMCrawlerCN) GetStockInfo(stockCode string, filter crawl.Filter) string {
 	if stockCode == "" {
-		return nil
+		return ""
 	}
-	stockInfos := make([]map[string]string, crawler.duration)
-	//从数据库读出来
-	return stockInfos
+	stockInfos := StockInfos{
+		Data: make([]db.StockInfo, 0),
+	}
+	result := db.DbEngine().Where("code = ?", stockCode).Find(&stockInfos.Data)
+	if result.Error != nil {
+		logrus.Errorln(result.Error)
+		return ""
+	}
+	datas, err := json.Marshal(stockInfos)
+	if err != nil {
+		logrus.Errorln(err)
+		return ""
+	}
+	return string(datas)
 }
 
-func (crawler *WMCrawlerCN) crawlStockInfo(stockCode string, filter crawl.Filter) {
+func (crawler *WMCrawlerCN) crawlStockInfo(stockCode string) {
 	if stockCode == "" {
 		return
 	}
 	stockCommonInfo := &db.StockCommonInfo{Code: stockCode}
 	crawler.updateStockCommonInfo(stockCommonInfo)
 
-	flags := filter()
+	flags := crawler.filter(nil)
 	//更新数据库数据
 	crawler.crawlStockName(stockCode)
 	for _, flag := range flags {
@@ -173,6 +196,7 @@ func (crawler *WMCrawlerCN) crawlStockInfo(stockCode string, filter crawl.Filter
 		case crawl.ROE:
 			crawler.crawlStockROE(stockCode)
 		case crawl.CASH_RATIO:
+			time.Sleep(10 * time.Second)
 			crawler.crawlStockCashRatio(stockCode)
 		case crawl.ASSET_LIABILITY_RATIO:
 			crawler.crawlStockAssetLiabilityRatio(stockCode)
@@ -197,6 +221,11 @@ func (crawler *WMCrawlerCN) GetPE(t int) (pe float64) {
 }
 
 func (crawler *WMCrawlerCN) crawlPE() {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorln(err)
+		}
+	}()
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
@@ -255,6 +284,11 @@ func (crawler *WMCrawlerCN) GetYield() float64 {
 }
 
 func (crawler *WMCrawlerCN) crawlYield() {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorln(err)
+		}
+	}()
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
@@ -346,6 +380,8 @@ func (crawler *WMCrawlerCN) CrawlFromIndex(condition string) string {
 		return ""
 	}
 	client := resty.New()
+	condition = strings.Replace(condition, ` `, ``, -1)
+	conditionUrl := url.QueryEscape(condition)
 	resp, err := client.R().SetFormData(map[string]string{
 		"question":         condition,
 		"perpage":          "1000",
@@ -358,7 +394,7 @@ func (crawler *WMCrawlerCN) CrawlFromIndex(condition string) string {
 		"block_list":       "",
 		"add_info":         `{"urp":{"scene":1,"company":1,"business":1},"contentType":"json"}`,
 	}).SetHeaders(map[string]string{
-		"Referer":    "http://www.iwencai.com/unifiedwap/result?w=%E8%BF%9E%E7%BB%AD%205%20%E5%B9%B4%E7%9A%84%20ROE%20%E5%A4%A7%E4%BA%8E%2015%25",
+		"Referer":    "http://www.iwencai.com/unifiedwap/result?w=" + conditionUrl + `&querytype=stock`,
 		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.67",
 		"Origin":     "http://www.iwencai.com",
 		"hexin-v":    hexinV,
@@ -379,6 +415,11 @@ func (crawler *WMCrawlerCN) CrawlFromIndex(condition string) string {
 }
 
 func (crawler *WMCrawlerCN) crawlStockPE(code string) {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorln(err)
+		}
+	}()
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
@@ -406,7 +447,8 @@ func (crawler *WMCrawlerCN) crawlStockPE(code string) {
 			return nil
 		}),
 		chromedp.Navigate(`http://stockpage.10jqka.com.cn/realHead_v2.html#hs_`+code),
-		chromedp.Sleep(1000*time.Millisecond),
+		chromedp.WaitVisible(`#fvaluep`, chromedp.ByID),
+		chromedp.Sleep(3000*time.Millisecond),
 		chromedp.Evaluate(`document.getElementById('fvaluep').innerText`, &text),
 	)
 	if err != nil {
@@ -432,6 +474,11 @@ func (crawler *WMCrawlerCN) crawlStockPE(code string) {
 }
 
 func (crawler *WMCrawlerCN) crawlStockName(code string) {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorln(err)
+		}
+	}()
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
@@ -485,6 +532,11 @@ func (crawler *WMCrawlerCN) crawlStockName(code string) {
 }
 
 func (crawler *WMCrawlerCN) crawlStockPrice(code string) {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorln(err)
+		}
+	}()
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
@@ -513,12 +565,16 @@ func (crawler *WMCrawlerCN) crawlStockPrice(code string) {
 			return nil
 		}),
 		chromedp.Navigate(`http://stockpage.10jqka.com.cn/realHead_v2.html#hs_`+code),
-		chromedp.WaitVisible(`#topenprice`, chromedp.ByID),
-		chromedp.Sleep(1000*time.Millisecond),
+		chromedp.WaitVisible(`#hexm_curPrice`, chromedp.ByID),
+		chromedp.Sleep(3000*time.Millisecond),
 		chromedp.Text(`#hexm_curPrice`, &text),
 	)
 	if err != nil {
 		logrus.Errorln(err)
+		return
+	}
+	if text == `--`{
+		logrus.Debugln(`****************************` + code + `:` + `price` + `********************************`)
 		return
 	}
 	stockCommonInfo := &db.StockCommonInfo{Code: code, Price: text}
@@ -540,6 +596,11 @@ func (crawler *WMCrawlerCN) crawlStockPrice(code string) {
 }
 
 func (crawler *WMCrawlerCN) crawlStockROE(code string) {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorln(err)
+		}
+	}()
 	condition := code + ` 连续 ` + strconv.Itoa(crawler.duration) + ` 年 ROE`
 	jsonResp := crawler.CrawlFromIndex(condition)
 	if jsonResp == "" {
@@ -577,6 +638,11 @@ func (crawler *WMCrawlerCN) crawlStockROE(code string) {
 }
 
 func (crawler *WMCrawlerCN) crawlStockCashRatio(code string) {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorln(err)
+		}
+	}()
 	condition := code + ` 连续 ` + strconv.Itoa(crawler.duration) + ` 年 净利润现金含量`
 	jsonResp := crawler.CrawlFromIndex(condition)
 	if jsonResp == "" {
@@ -584,6 +650,7 @@ func (crawler *WMCrawlerCN) crawlStockCashRatio(code string) {
 		return
 	}
 	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.0.data.datas")
+	logrus.Debugln(`****************************` + code + `:` + `cashRatio` + `********************************`)
 	for _, data := range datasObject.Array() {
 		dataInfo := data.Value().(map[string]interface{})
 		var cashRatio string
@@ -610,12 +677,17 @@ func (crawler *WMCrawlerCN) crawlStockCashRatio(code string) {
 			Price:     crawler.commonInfos[code].Price,
 			CashRatio: cashRatio,
 		}
-		//logrus.Infoln(`---------------------------` + code + `:` + cashRatio + `---------------------------------`)
+		logrus.Debugln(`---------------------------` + code + `:` + cashRatio + `---------------------------------`)
 		crawler.updateStockInfo(code, period, &stockInfo)
 	}
 }
 
 func (crawler *WMCrawlerCN) crawlStockAssetLiabilityRatio(code string) {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorln(err)
+		}
+	}()
 	condition := code + ` 连续 ` + strconv.Itoa(crawler.duration) + ` 年 资产负债率`
 	jsonResp := crawler.CrawlFromIndex(condition)
 	if jsonResp == "" {
@@ -655,6 +727,11 @@ func (crawler *WMCrawlerCN) crawlStockAssetLiabilityRatio(code string) {
 }
 
 func (crawler *WMCrawlerCN) crawlStockGrossProfitRatio(code string) {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorln(err)
+		}
+	}()
 	condition := code + ` 连续 ` + strconv.Itoa(crawler.duration) + ` 年 毛利率`
 	jsonResp := crawler.CrawlFromIndex(condition)
 	if jsonResp == "" {
@@ -694,6 +771,11 @@ func (crawler *WMCrawlerCN) crawlStockGrossProfitRatio(code string) {
 }
 
 func (crawler *WMCrawlerCN) crawlStockDividendRatio(code string) {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorln(err)
+		}
+	}()
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
@@ -775,6 +857,11 @@ func (crawler *WMCrawlerCN) crawlStockDividendRatio(code string) {
 }
 
 func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
+	defer func() {
+		if err := recover(); err != nil {
+			logrus.Errorln(err)
+		}
+	}()
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", config.Headless),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
@@ -849,7 +936,13 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 			continue
 		}
 		period := v[0]
-		interestRatio := v[1][:6]
+		var interestRatio string
+		if len(v[1]) > 6 {
+			interestRatio = v[1][:6]
+		} else {
+			interestRatio = v[1]
+		}
+
 		stockInfo := db.StockInfo{
 			Code:          code,
 			Period:        period,
@@ -863,27 +956,37 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 }
 
 func (crawler *WMCrawlerCN) updateStockCommonInfo(stockCommonInfo *db.StockCommonInfo) {
-
-	has, _ := db.DbEngine().Where("code = ? ", stockCommonInfo.Code).Get(&db.StockCommonInfo{})
-	if has {
-		db.DbEngine().Where("code = ? ", stockCommonInfo.Code).Update(stockCommonInfo)
+	tmpInfo := db.StockCommonInfo{}
+	result := db.DbEngine().Where("code = ? ", stockCommonInfo.Code).First(&tmpInfo)
+	if result.Error == gorm.ErrRecordNotFound {
+		result = db.DbEngine().Create(stockCommonInfo)
+		if result.Error != nil {
+			logrus.Errorln(result.Error)
+		}
+	} else if result.Error == nil {
+		result = db.DbEngine().Model(&tmpInfo).Where("code = ? ", stockCommonInfo.Code).Updates(stockCommonInfo)
+		if result.Error != nil {
+			logrus.Errorln(result.Error)
+		}
 	} else {
-		db.DbEngine().Insert(stockCommonInfo)
+		logrus.Errorln(result.Error)
 	}
 }
 
 func (crawler *WMCrawlerCN) updateStockInfo(code string, period string, stockInfo *db.StockInfo) {
-
-	has, _ := db.DbEngine().Where("code = ? and period = ?", code, period).Get(&db.StockInfo{})
-	if has {
-		_, err := db.DbEngine().Where("code = ? and period = ?", code, period).Update(stockInfo)
-		if err != nil {
-			logrus.Errorln(err)
+	tmpInfo := db.StockInfo{}
+	result := db.DbEngine().Where("code = ? and period = ?", code, period).First(&tmpInfo)
+	if result.Error == gorm.ErrRecordNotFound {
+		result = db.DbEngine().Create(stockInfo)
+		if result.Error != nil {
+			logrus.Errorln(result.Error)
+		}
+	} else if result.Error == nil {
+		result = db.DbEngine().Model(&tmpInfo).Where("code = ? and period = ?", code, period).Updates(stockInfo)
+		if result.Error != nil {
+			logrus.Errorln(result.Error)
 		}
 	} else {
-		_, err := db.DbEngine().Insert(stockInfo)
-		if err != nil {
-			logrus.Errorln(err)
-		}
+		logrus.Errorln(result.Error)
 	}
 }
