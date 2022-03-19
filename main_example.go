@@ -361,23 +361,18 @@ func main5() {
 	}
 }
 
-func main() {
+func main6() {
 
 	config.InitConfig()
 	config.InitLog()
 	db.InitDatabse()
-	c := crawler.NewCNCrawl(
-		`连续 5 年 ROE 大于 20%，连续 5 年净利润现金含量大于 80%，连续 5 年毛利率大于 30%，上市大于三年`,
-		10,
-		config.CrawlTimeout,
-	)
 
 	start := time.Now().Unix()
-	c.Start()
+	crawler.StockCrawler_cn.Start()
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	logrus.Println("quit (%v)", <-sig)
-	c.Stop()
+	crawler.StockCrawler_cn.Stop()
 	duration := time.Now().Unix() - start
 	logrus.Println("总耗时:", duration)
 }

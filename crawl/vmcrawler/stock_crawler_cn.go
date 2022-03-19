@@ -23,18 +23,26 @@ import (
 	"ASS/utils"
 )
 
+var StockCrawler_cn = NewCNCrawl(
+	`连续 5 年 ROE 大于 20%，连续 5 年净利润现金含量大于 80%，连续 5 年毛利率大于 30%，上市大于三年`,
+	10,
+	config.CrawlTimeout,
+)
+
 type WMCrawlerCN struct {
-	firstCondition string
-	duration       int
-	commonInfos    map[string]*db.StockCommonInfo
-	stockCodes     []string
-	stockCodesMtx  sync.Mutex
-	crawlTimeout   int
-	pe_sh          float64
-	pe_sz          float64
-	yield          float64
-	isRunning      bool
+	condition     string
+	duration      int
+	commonInfos   map[string]*db.StockCommonInfo
+	stockCodes    []string
+	stockCodesMtx sync.Mutex
+	crawlTimeout  int
+	pe_sh         float64
+	pe_sz         float64
+	yield         float64
+	isRunning     bool
 }
+
+
 
 type StockInfos struct {
 	Data []db.StockInfo `json:"datas"`
@@ -42,17 +50,25 @@ type StockInfos struct {
 
 func NewCNCrawl(firstCondition string, duration int, crawlTimeout int) (c *WMCrawlerCN) {
 	c = &WMCrawlerCN{
-		firstCondition: firstCondition,
-		duration:       duration,
-		commonInfos:    make(map[string]*db.StockCommonInfo, 0),
-		stockCodes:     make([]string, 0),
-		crawlTimeout:   crawlTimeout,
-		pe_sh:          -1,
-		pe_sz:          -1,
-		yield:          -1,
-		isRunning:      false,
+		condition:    firstCondition,
+		duration:     duration,
+		commonInfos:  make(map[string]*db.StockCommonInfo, 0),
+		stockCodes:   make([]string, 0),
+		crawlTimeout: crawlTimeout,
+		pe_sh:        -1,
+		pe_sz:        -1,
+		yield:        -1,
+		isRunning:    false,
 	}
 	return
+}
+
+func (crawler *WMCrawlerCN) SetCodition(condition string) {
+	crawler.condition = condition
+}
+
+func (crawler *WMCrawlerCN) GetCodition() string {
+	return crawler.condition
 }
 
 func (crawler *WMCrawlerCN) Start() {
@@ -118,7 +134,8 @@ func (crawler *WMCrawlerCN) GetStockCodes() []string {
 }
 
 func (crawler *WMCrawlerCN) crawlStockCodes() {
-	jsonResp := crawler.CrawlFromIndex(crawler.firstCondition)
+	crawler.stockCodes = crawler.stockCodes[0:0]
+	jsonResp := crawler.CrawlFromIndex(crawler.condition)
 	if jsonResp == "" {
 		return
 	}
@@ -573,7 +590,7 @@ func (crawler *WMCrawlerCN) crawlStockPrice(code string) {
 		logrus.Errorln(err)
 		return
 	}
-	if text == `--`{
+	if text == `--` {
 		logrus.Debugln(`****************************` + code + `:` + `price` + `********************************`)
 		return
 	}

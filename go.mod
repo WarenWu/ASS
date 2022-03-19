@@ -6,10 +6,10 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20220217222649-d8c14a5c6edf
 	github.com/chromedp/chromedp v0.7.8
 	github.com/fsnotify/fsnotify v1.5.1
+	github.com/gin-gonic/gin v1.7.7
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/jonboulle/clockwork v0.1.0 // indirect
-	github.com/labstack/echo/v4 v4.7.2 // indirect
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/lestrrat-go/strftime v1.0.5 // indirect
 	github.com/sirupsen/logrus v1.8.1
