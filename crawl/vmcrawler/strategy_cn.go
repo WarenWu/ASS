@@ -10,7 +10,7 @@ type WMStrategyCN struct {
 	//StockType     string
 	StockPrice    float64
 	StockPE       float64
-	StockYield    float64 //派息率
+	StockYield    float64 //动态股利
 	PE            float64 //市场PE
 	Yield         float64 //国债收益率
 	AimMinPE      float64 //买入目标市场市盈率
@@ -42,5 +42,3 @@ func (strategy *WMStrategyCN) aimPrice() float64 {
 	priceFromYiled := strategy.StockYield / strategy.Yield
 	return math.Min(priceFormPE, priceFromYiled)
 }
-
-

@@ -1,4 +1,6 @@
 ass.log.*
 .idea/*
 .vscode/launch.json
-ASS.exe
+
+*.exe
+
