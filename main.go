@@ -35,10 +35,12 @@ func main() {
 
 	start := time.Now().Unix()
 	crawler.StockCrawler_cn.Start()
+	crawler.Judger.Start()
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	logrus.Println("quit (%v)", <-sig)
 	crawler.StockCrawler_cn.Stop()
+	crawler.Judger.Stop()
 	duration := time.Now().Unix() - start
 	logrus.Println("总耗时:", duration)
 }

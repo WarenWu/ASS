@@ -22,8 +22,6 @@ const (
 )
 
 type Filter func() []string //返回股票需要查询的财务指标
-type BuyJudge func() bool   //判断买入时机
-type SellJudge func() bool  //判断卖出时机
 
 //定义爬虫接口：
 type StockCrawler interface {
@@ -38,14 +36,7 @@ type StockCrawler interface {
 	GetYield() float64          //爬取整体收益率（国债）
 }
 
-//买入卖出接口，返回是否可以买入或卖出
-type Processor interface {
-	BuyStatus(BuyJudge) bool
-	SellStatus(SellJudge) bool
-}
-
-//策略接口，包括返回股票信息项、买入策略、卖出策略
-type Strategy interface {
-	GetBuyJudge() BuyJudge
-	GetSellJudge() SellJudge
+type Judge interface {
+	BuyJudge() bool
+	SellJudge() bool
 }

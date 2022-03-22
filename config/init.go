@@ -48,6 +48,10 @@ func setDefault() {
 	viper.SetDefault("appname", AppName_default)
 	viper.SetDefault("crawltimeout", CrawlTimeout_default)
 	viper.SetDefault("headless", Headless_default)
+	viper.SetDefault("cn_stock_pe_max", MaxStockPe_default)
+	viper.SetDefault("cn_stock_pe_min", MinStockPe_default)
+	viper.SetDefault("cn_pe_max", MaxPe_default)
+	viper.SetDefault("cn_pe_min", MinPe_default)
 }
 
 func setViper() {
@@ -82,6 +86,10 @@ func readConfig() {
 	MysqlDb = viper.GetString("mysql.db")
 	CrawlTimeout = viper.GetInt("crawltimeout")
 	Headless = viper.GetBool("headless")
+	MaxStockPe = viper.GetInt("cn_stock_pe_max")
+	MinStockPe = viper.GetInt("cn_stock_pe_min")
+	MaxPe = viper.GetInt("cn_pe_max")
+	MinPe = viper.GetInt("cn_pe_min")
 }
 
 func InitLog() {

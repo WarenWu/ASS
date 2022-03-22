@@ -1,5 +1,7 @@
 package handler
 
+import "ASS/db"
+
 type BaseResponse struct {
 	ResultCode int    `json:"resultCode"`
 	Successful bool   `json:"successful"`
@@ -8,12 +10,12 @@ type BaseResponse struct {
 
 type GetCNStockInfosResponse struct {
 	BaseResponse
-	Data string `json:"data"`
+	Data []db.StockInfo `json:"data"`
 }
 
 type GetCNStockInfoResponse struct {
 	BaseResponse
-	Data string `json:"data"`
+	Data []db.StockInfo `json:"data"`
 }
 
 type AddCNStockRequest struct {

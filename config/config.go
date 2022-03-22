@@ -16,6 +16,10 @@ var (
 	MysqlDb         string
 	CrawlTimeout    int //s
 	Headless        bool
+	MaxStockPe      int
+	MinStockPe      int
+	MaxPe           int
+	MinPe           int
 )
 
 const (
@@ -37,4 +41,8 @@ const (
 	MysqlDb_default         = "ass_vm"
 	CrawlTimeout_default    = 30
 	Headless_default        = true
+	MaxStockPe_default      = 40
+	MinStockPe_default      = 20
+	MaxPe_default           = 60
+	MinPe_default           = 15
 )

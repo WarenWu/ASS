@@ -2,7 +2,6 @@ package wmcrawler
 
 import (
 	"context"
-	"encoding/json"
 	"net/url"
 	"strconv"
 	"strings"
@@ -39,13 +38,7 @@ type WMCrawlerCN struct {
 	pe_sh         float64
 	pe_sz         float64
 	yield         float64
-	isRunning     bool
-}
-
-
-
-type StockInfos struct {
-	Data []db.StockInfo `json:"datas"`
+	isRunning     chan struct{}
 }
 
 func NewCNCrawl(firstCondition string, duration int, crawlTimeout int) (c *WMCrawlerCN) {
@@ -58,7 +51,7 @@ func NewCNCrawl(firstCondition string, duration int, crawlTimeout int) (c *WMCra
 		pe_sh:        -1,
 		pe_sz:        -1,
 		yield:        -1,
-		isRunning:    false,
+		isRunning:    make(chan struct{}),
 	}
 	return
 }
@@ -72,22 +65,25 @@ func (crawler *WMCrawlerCN) GetCodition() string {
 }
 
 func (crawler *WMCrawlerCN) Start() {
-	crawler.isRunning = true
 	go func() {
 		logrus.Infoln("WMCrawlerCN start crawling...")
-		for crawler.isRunning {
+		for {
 			crawler.crawlStockCodes()
 			crawler.crawlPE()
 			crawler.crawlYield()
 			crawler.crawlStockInfos()
-			time.Sleep(time.Second * 10 * 60)
+			select {
+			case <-time.After(time.Second * 10 * 60):
+			case <-crawler.isRunning:
+				logrus.Infoln("WMCrawlerCN stop crawling...")
+				return
+			}
 		}
-		logrus.Infoln("WMCrawlerCN stop crawling...")
 	}()
 }
 
 func (crawler *WMCrawlerCN) Stop() {
-	crawler.isRunning = false
+	crawler.isRunning <- struct{}{}
 }
 
 func (crawler *WMCrawlerCN) PutStockCode(stockCode string) {
@@ -146,22 +142,16 @@ func (crawler *WMCrawlerCN) crawlStockCodes() {
 	}
 }
 
-func (crawler *WMCrawlerCN) GetStockInfos(filter crawl.Filter) string {
+func (crawler *WMCrawlerCN) GetStockInfos(filter crawl.Filter) []db.StockInfo {
 
-	stockInfos := StockInfos{
-		Data: make([]db.StockInfo, 0),
-	}
-	result := db.DbEngine().Find(&stockInfos.Data)
+	data := make([]db.StockInfo, 0)
+	result := db.DbEngine().Order("name, period desc").Find(&data)
 	if result.Error != nil {
 		logrus.Errorln(result.Error)
-		return ""
+		return nil
 	}
-	datas, err := json.Marshal(stockInfos)
-	if err != nil {
-		logrus.Errorln(err)
-		return ""
-	}
-	return string(datas)
+
+	return data
 }
 
 func (crawler *WMCrawlerCN) crawlStockInfos() {
@@ -174,24 +164,17 @@ func (crawler *WMCrawlerCN) crawlStockInfos() {
 	}
 }
 
-func (crawler *WMCrawlerCN) GetStockInfo(stockCode string, filter crawl.Filter) string {
+func (crawler *WMCrawlerCN) GetStockInfo(stockCode string, filter crawl.Filter) []db.StockInfo {
 	if stockCode == "" {
-		return ""
+		return nil
 	}
-	stockInfos := StockInfos{
-		Data: make([]db.StockInfo, 0),
-	}
-	result := db.DbEngine().Where("code = ?", stockCode).Find(&stockInfos.Data)
+	data := make([]db.StockInfo, 0)
+	result := db.DbEngine().Where("code = ?", stockCode).Order("name, period desc").Find(&data)
 	if result.Error != nil {
 		logrus.Errorln(result.Error)
-		return ""
+		return nil
 	}
-	datas, err := json.Marshal(stockInfos)
-	if err != nil {
-		logrus.Errorln(err)
-		return ""
-	}
-	return string(datas)
+	return data
 }
 
 func (crawler *WMCrawlerCN) crawlStockInfo(stockCode string) {
