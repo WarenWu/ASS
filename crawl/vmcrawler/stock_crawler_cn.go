@@ -18,7 +18,7 @@ import (
 
 	"ASS/config"
 	"ASS/crawl"
-	"ASS/db"
+	"ASS/model"
 	"ASS/utils"
 )
 
@@ -31,7 +31,7 @@ var StockCrawler_cn = NewCNCrawl(
 type WMCrawlerCN struct {
 	condition     string
 	duration      int
-	commonInfos   map[string]*db.StockCommonInfo
+	commonInfos   map[string]*model.StockCommonInfo
 	stockCodes    []string
 	stockCodesMtx sync.Mutex
 	crawlTimeout  int
@@ -45,7 +45,7 @@ func NewCNCrawl(firstCondition string, duration int, crawlTimeout int) (c *WMCra
 	c = &WMCrawlerCN{
 		condition:    firstCondition,
 		duration:     duration,
-		commonInfos:  make(map[string]*db.StockCommonInfo, 0),
+		commonInfos:  make(map[string]*model.StockCommonInfo, 0),
 		stockCodes:   make([]string, 0),
 		crawlTimeout: crawlTimeout,
 		pe_sh:        -1,
@@ -130,7 +130,7 @@ func (crawler *WMCrawlerCN) GetStockCodes() []string {
 }
 
 func (crawler *WMCrawlerCN) crawlStockCodes() {
-	crawler.stockCodes = crawler.stockCodes[0:0]
+	stockCodes := make([]string, 0)
 	jsonResp := crawler.CrawlFromIndex(crawler.condition)
 	if jsonResp == "" {
 		return
@@ -138,20 +138,20 @@ func (crawler *WMCrawlerCN) crawlStockCodes() {
 	datasObject := gjson.Get(jsonResp, "data.answer.0.txt.0.content.components.0.data.datas")
 	for _, data := range datasObject.Array() {
 		stockInfo := data.Value().(map[string]interface{})
-		crawler.stockCodes = append(crawler.stockCodes, stockInfo["code"].(string))
+		stockCodes = append(stockCodes, stockInfo["code"].(string))
 	}
+	crawler.stockCodesMtx.Lock()
+	crawler.stockCodes = stockCodes
+	crawler.stockCodesMtx.Unlock()
 }
 
-func (crawler *WMCrawlerCN) GetStockInfos(filter crawl.Filter) []db.StockInfo {
-
-	data := make([]db.StockInfo, 0)
-	result := db.DbEngine().Order("name, period desc").Find(&data)
-	if result.Error != nil {
-		logrus.Errorln(result.Error)
-		return nil
+func (crawler *WMCrawlerCN) GetStockInfos(filter crawl.Filter) map[string][]model.StockInfo {
+	ret := make(map[string][]model.StockInfo, 0)
+	codes := StockCrawler_cn.GetStockCodes()
+	for _, v := range codes {
+		ret[v] = crawler.GetStockInfo(v, nil)
 	}
-
-	return data
+	return ret
 }
 
 func (crawler *WMCrawlerCN) crawlStockInfos() {
@@ -164,12 +164,12 @@ func (crawler *WMCrawlerCN) crawlStockInfos() {
 	}
 }
 
-func (crawler *WMCrawlerCN) GetStockInfo(stockCode string, filter crawl.Filter) []db.StockInfo {
+func (crawler *WMCrawlerCN) GetStockInfo(stockCode string, filter crawl.Filter) []model.StockInfo {
 	if stockCode == "" {
 		return nil
 	}
-	data := make([]db.StockInfo, 0)
-	result := db.DbEngine().Where("code = ?", stockCode).Order("name, period desc").Find(&data)
+	data := make([]model.StockInfo, 0)
+	result := model.DbEngine().Where("code = ?", stockCode).Order("name, period desc").Find(&data)
 	if result.Error != nil {
 		logrus.Errorln(result.Error)
 		return nil
@@ -181,7 +181,7 @@ func (crawler *WMCrawlerCN) crawlStockInfo(stockCode string) {
 	if stockCode == "" {
 		return
 	}
-	stockCommonInfo := &db.StockCommonInfo{Code: stockCode}
+	stockCommonInfo := &model.StockCommonInfo{Code: stockCode}
 	crawler.updateStockCommonInfo(stockCommonInfo)
 
 	flags := crawler.filter(nil)
@@ -455,11 +455,11 @@ func (crawler *WMCrawlerCN) crawlStockPE(code string) {
 		logrus.Errorln(err)
 		return
 	}
-	stockCommonInfo := &db.StockCommonInfo{Code: code, PE: text}
+	stockCommonInfo := &model.StockCommonInfo{Code: code, PE: text}
 	crawler.updateStockCommonInfo(stockCommonInfo)
 
-	stockInfos := make([]db.StockInfo, 0)
-	db.DbEngine().Where("code = ?", code).Find(&stockInfos)
+	stockInfos := make([]model.StockInfo, 0)
+	model.DbEngine().Where("code = ?", code).Find(&stockInfos)
 	for i, _ := range stockInfos {
 		stockInfos[i].PE = text
 		crawler.updateStockInfo(code, stockInfos[i].Period, &stockInfos[i])
@@ -513,11 +513,11 @@ func (crawler *WMCrawlerCN) crawlStockName(code string) {
 		logrus.Errorln(err)
 		return
 	}
-	stockCommonInfo := &db.StockCommonInfo{Code: code, Name: text}
+	stockCommonInfo := &model.StockCommonInfo{Code: code, Name: text}
 	crawler.updateStockCommonInfo(stockCommonInfo)
 
-	stockInfos := make([]db.StockInfo, 0)
-	db.DbEngine().Where("code = ?", code).Find(&stockInfos)
+	stockInfos := make([]model.StockInfo, 0)
+	model.DbEngine().Where("code = ?", code).Find(&stockInfos)
 	for i, _ := range stockInfos {
 		stockInfos[i].Name = text
 		crawler.updateStockInfo(code, stockInfos[i].Period, &stockInfos[i])
@@ -577,11 +577,11 @@ func (crawler *WMCrawlerCN) crawlStockPrice(code string) {
 		logrus.Debugln(`****************************` + code + `:` + `price` + `********************************`)
 		return
 	}
-	stockCommonInfo := &db.StockCommonInfo{Code: code, Price: text}
+	stockCommonInfo := &model.StockCommonInfo{Code: code, Price: text}
 	crawler.updateStockCommonInfo(stockCommonInfo)
 
-	stockInfos := make([]db.StockInfo, 0)
-	db.DbEngine().Where("code = ?", code).Find(&stockInfos)
+	stockInfos := make([]model.StockInfo, 0)
+	model.DbEngine().Where("code = ?", code).Find(&stockInfos)
 	for i, _ := range stockInfos {
 		stockInfos[i].Price = text
 		crawler.updateStockInfo(code, stockInfos[i].Period, &stockInfos[i])
@@ -625,7 +625,7 @@ func (crawler *WMCrawlerCN) crawlStockROE(code string) {
 			continue
 		}
 
-		stockInfo := db.StockInfo{
+		stockInfo := model.StockInfo{
 			Code:   code,
 			Period: period,
 			Name:   crawler.commonInfos[code].Name,
@@ -669,7 +669,7 @@ func (crawler *WMCrawlerCN) crawlStockCashRatio(code string) {
 			continue
 		}
 
-		stockInfo := db.StockInfo{
+		stockInfo := model.StockInfo{
 			Code:      code,
 			Period:    period,
 			Name:      crawler.commonInfos[code].Name,
@@ -714,7 +714,7 @@ func (crawler *WMCrawlerCN) crawlStockAssetLiabilityRatio(code string) {
 			continue
 		}
 
-		stockInfo := db.StockInfo{
+		stockInfo := model.StockInfo{
 			Code:                code,
 			Period:              period,
 			Name:                crawler.commonInfos[code].Name,
@@ -758,7 +758,7 @@ func (crawler *WMCrawlerCN) crawlStockGrossProfitRatio(code string) {
 			continue
 		}
 
-		stockInfo := db.StockInfo{
+		stockInfo := model.StockInfo{
 			Code:             code,
 			Period:           period,
 			Name:             crawler.commonInfos[code].Name,
@@ -844,7 +844,7 @@ func (crawler *WMCrawlerCN) crawlStockDividendRatio(code string) {
 		}
 		period := v[0]
 		dividendRatio := v[1]
-		stockInfo := db.StockInfo{
+		stockInfo := model.StockInfo{
 			Code:          code,
 			Period:        period,
 			Name:          crawler.commonInfos[code].Name,
@@ -943,7 +943,7 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 			interestRatio = v[1]
 		}
 
-		stockInfo := db.StockInfo{
+		stockInfo := model.StockInfo{
 			Code:          code,
 			Period:        period,
 			Name:          crawler.commonInfos[code].Name,
@@ -955,16 +955,16 @@ func (crawler *WMCrawlerCN) crawlStockInterestRatio(code string) {
 	}
 }
 
-func (crawler *WMCrawlerCN) updateStockCommonInfo(stockCommonInfo *db.StockCommonInfo) {
-	tmpInfo := db.StockCommonInfo{}
-	result := db.DbEngine().Where("code = ? ", stockCommonInfo.Code).First(&tmpInfo)
+func (crawler *WMCrawlerCN) updateStockCommonInfo(stockCommonInfo *model.StockCommonInfo) {
+	tmpInfo := model.StockCommonInfo{}
+	result := model.DbEngine().Where("code = ? ", stockCommonInfo.Code).First(&tmpInfo)
 	if result.Error == gorm.ErrRecordNotFound {
-		result = db.DbEngine().Create(stockCommonInfo)
+		result = model.DbEngine().Create(stockCommonInfo)
 		if result.Error != nil {
 			logrus.Errorln(result.Error)
 		}
 	} else if result.Error == nil {
-		result = db.DbEngine().Model(&tmpInfo).Where("code = ? ", stockCommonInfo.Code).Updates(stockCommonInfo)
+		result = model.DbEngine().Model(&tmpInfo).Where("code = ? ", stockCommonInfo.Code).Updates(stockCommonInfo)
 		if result.Error != nil {
 			logrus.Errorln(result.Error)
 		}
@@ -973,16 +973,16 @@ func (crawler *WMCrawlerCN) updateStockCommonInfo(stockCommonInfo *db.StockCommo
 	}
 }
 
-func (crawler *WMCrawlerCN) updateStockInfo(code string, period string, stockInfo *db.StockInfo) {
-	tmpInfo := db.StockInfo{}
-	result := db.DbEngine().Where("code = ? and period = ?", code, period).First(&tmpInfo)
+func (crawler *WMCrawlerCN) updateStockInfo(code string, period string, stockInfo *model.StockInfo) {
+	tmpInfo := model.StockInfo{}
+	result := model.DbEngine().Where("code = ? and period = ?", code, period).First(&tmpInfo)
 	if result.Error == gorm.ErrRecordNotFound {
-		result = db.DbEngine().Create(stockInfo)
+		result = model.DbEngine().Create(stockInfo)
 		if result.Error != nil {
 			logrus.Errorln(result.Error)
 		}
 	} else if result.Error == nil {
-		result = db.DbEngine().Model(&tmpInfo).Where("code = ? and period = ?", code, period).Updates(stockInfo)
+		result = model.DbEngine().Model(&tmpInfo).Where("code = ? and period = ?", code, period).Updates(stockInfo)
 		if result.Error != nil {
 			logrus.Errorln(result.Error)
 		}

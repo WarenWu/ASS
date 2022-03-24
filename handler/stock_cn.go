@@ -29,7 +29,7 @@ func GetStockInfos(c *gin.Context) {
 }
 
 func GetStockInfo(c *gin.Context) {
-	code := c.Query("stockcode")
+	code := c.Query("code")
 	msg := GetCNStockInfoResponse{
 		BaseResponse: baseMsg,
 		Data:         crawler.StockCrawler_cn.GetStockInfo(code, nil),
@@ -92,6 +92,32 @@ func SetStockCondtion(c *gin.Context) {
 		msg.Successful = false
 	} else {
 		crawler.StockCrawler_cn.SetCodition(r.Condition)
+	}
+	c.JSON(msg.ResultCode, msg)
+}
+
+func GetJudgeResult(c *gin.Context) {
+	code := c.Query("code")
+	msg := GetCNStockJudgeResultResponse{
+		BaseResponse: baseMsg,
+		Data:         crawler.Judger_cn.GetJudgeResult(code),
+	}
+	c.JSON(msg.ResultCode, msg)
+}
+
+func SetStockStrategy(c *gin.Context) {
+	msg := SetCNStockConditionResponse{
+		BaseResponse: baseMsg,
+	}
+	r := SetCNStockStrategyRequest{}
+	err := c.ShouldBind(&r)
+	if err != nil {
+		logrus.Errorln(err)
+		msg.ResultCode = http.StatusBadRequest
+		msg.ResultMsg = "pararms exception!"
+		msg.Successful = false
+	} else {
+		crawler.Judger_cn.SetStrategy(r.code, r.strategy)
 	}
 	c.JSON(msg.ResultCode, msg)
 }

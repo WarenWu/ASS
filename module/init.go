@@ -2,12 +2,12 @@ package module
 
 import (
 	"ASS/config"
-	"ASS/db"
+	"ASS/model"
 	"ASS/router"
 )
 
 func InitModule() {
 	config.InitConfig()
 	router.InitHttpRouter()
-	db.InitDatabse()
+	model.InitDatabse()
 }

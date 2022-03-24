@@ -7,10 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -23,9 +20,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 
-	"ASS/config"
-	crawler "ASS/crawl/vmcrawler"
-	"ASS/db"
 	"ASS/utils"
 )
 
@@ -359,20 +353,4 @@ func main5() {
 		logrus.Error(err)
 		return
 	}
-}
-
-func main6() {
-
-	config.InitConfig()
-	config.InitLog()
-	db.InitDatabse()
-
-	start := time.Now().Unix()
-	crawler.StockCrawler_cn.Start()
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	logrus.Println("quit (%v)", <-sig)
-	crawler.StockCrawler_cn.Stop()
-	duration := time.Now().Unix() - start
-	logrus.Println("总耗时:", duration)
 }

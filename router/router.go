@@ -29,10 +29,12 @@ func InitHttpRouter() {
 	router.Use(AccessLogHandler())
 	router.GET("/cn/stockInfos", handler.GetStockInfos)
 	router.GET("/cn/stockInfo", handler.GetStockInfo)
-	router.POST("/cn/add/stock", handler.AddStock)
-	router.POST("/cn/del/stock", handler.DelStock)
-	router.GET("/cn/condition", handler.GetStockCondtion)
-	router.POST("/cn/set/condition", handler.SetStockCondtion)
+	router.POST("/cn/stock/add", handler.AddStock)
+	router.POST("/cn/stock/del", handler.DelStock)
+	router.GET("/cn/condition/get", handler.GetStockCondtion)
+	router.POST("/cn/condition/set", handler.SetStockCondtion)
+	router.GET("/cn/judge/get", handler.GetJudgeResult)
+	router.POST("/cn/strategy/set", handler.SetStockStrategy)
 	//router.GET("/swagger/*any", gs.DisablingWrapHandler(swaggerFiles.Handler, "DISABLE_SWAG"))
 }
 

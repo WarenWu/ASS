@@ -27,6 +27,7 @@ func init() {
 	pflag.StringVar(&option.ConfigFileName, "configFileName", ConfigFileName_defualt, "configfile name")
 	pflag.StringVar(&option.ConfigFilePath, "configFilePath", ConfigFilePath_defualt, "configfile path")
 	pflag.StringVar(&option.ConfigFileType, "configFileType", ConfigFileType_defualt, "configfile fmt")
+	InitConfig()
 }
 
 func InitConfig() {

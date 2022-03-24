@@ -1,6 +1,6 @@
 package handler
 
-import "ASS/db"
+import "ASS/model"
 
 type BaseResponse struct {
 	ResultCode int    `json:"resultCode"`
@@ -10,12 +10,12 @@ type BaseResponse struct {
 
 type GetCNStockInfosResponse struct {
 	BaseResponse
-	Data []db.StockInfo `json:"data"`
+	Data map[string][]model.StockInfo `json:"data"`
 }
 
 type GetCNStockInfoResponse struct {
 	BaseResponse
-	Data []db.StockInfo `json:"data"`
+	Data []model.StockInfo `json:"data"`
 }
 
 type AddCNStockRequest struct {
@@ -45,4 +45,14 @@ type SetCNStockConditionResponse struct {
 type GetCNStockConditionResponse struct {
 	BaseResponse
 	Data string `json:"data"`
+}
+
+type GetCNStockJudgeResultResponse struct {
+	BaseResponse
+	Data model.StockJudgeResult `json:"data"`
+}
+
+type SetCNStockStrategyRequest struct {
+	code string `json:"code" binding:"required"`
+	strategy model.StrategyCN `json:"strategy" binding:"required"`
 }
