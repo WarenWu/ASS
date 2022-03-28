@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"ASS/config"
-	//_ "tbsc/docs"
+	_ "ASS/docs"
 	"ASS/handler"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	//gs "github.com/swaggo/gin-swagger"
-	//"github.com/swaggo/gin-swagger/swaggerFiles"
+	gs "github.com/swaggo/gin-swagger"
+	"github.com/swaggo/gin-swagger/swaggerFiles"
 )
 
 var router *gin.Engine
@@ -35,7 +35,7 @@ func InitHttpRouter() {
 	router.POST("/cn/condition/set", handler.SetStockCondtion)
 	router.GET("/cn/judge/get", handler.GetJudgeResult)
 	router.POST("/cn/strategy/set", handler.SetStockStrategy)
-	//router.GET("/swagger/*any", gs.DisablingWrapHandler(swaggerFiles.Handler, "DISABLE_SWAG"))
+	router.GET("/swagger/*any", gs.DisablingWrapHandler(swaggerFiles.Handler, "DISABLE_SWAG"))
 }
 
 type CustomResponseWriter struct {
@@ -60,8 +60,7 @@ func AccessLogHandler() gin.HandlerFunc {
 			return
 		}
 
-		if strings.Contains(c.Request.RequestURI, "heartbeat") &&
-			(config.LogLevel != "trace" && config.LogLevel != "debug") {
+		if config.LogLevel != "trace" && config.LogLevel != "debug" {
 			c.Next()
 			return
 		}

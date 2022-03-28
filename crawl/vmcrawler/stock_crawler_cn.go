@@ -38,10 +38,13 @@ type WMCrawlerCN struct {
 	pe_sh         float64
 	pe_sz         float64
 	yield         float64
-	isRunning     chan struct{}
+	ctx           context.Context
+	cancel        context.CancelFunc
+	w             sync.WaitGroup
 }
 
 func NewCNCrawl(firstCondition string, duration int, crawlTimeout int) (c *WMCrawlerCN) {
+	ctx, cancel := context.WithCancel(context.Background())
 	c = &WMCrawlerCN{
 		condition:    firstCondition,
 		duration:     duration,
@@ -51,7 +54,8 @@ func NewCNCrawl(firstCondition string, duration int, crawlTimeout int) (c *WMCra
 		pe_sh:        -1,
 		pe_sz:        -1,
 		yield:        -1,
-		isRunning:    make(chan struct{}),
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 	return
 }
@@ -65,7 +69,9 @@ func (crawler *WMCrawlerCN) GetCodition() string {
 }
 
 func (crawler *WMCrawlerCN) Start() {
+	crawler.w.Add(1)
 	go func() {
+		defer crawler.w.Done()
 		logrus.Infoln("WMCrawlerCN start crawling...")
 		for {
 			crawler.crawlStockCodes()
@@ -74,8 +80,7 @@ func (crawler *WMCrawlerCN) Start() {
 			crawler.crawlStockInfos()
 			select {
 			case <-time.After(time.Second * 10 * 60):
-			case <-crawler.isRunning:
-				logrus.Infoln("WMCrawlerCN stop crawling...")
+			case <-crawler.ctx.Done():
 				return
 			}
 		}
@@ -83,7 +88,9 @@ func (crawler *WMCrawlerCN) Start() {
 }
 
 func (crawler *WMCrawlerCN) Stop() {
-	crawler.isRunning <- struct{}{}
+	crawler.cancel()
+	crawler.w.Wait()
+	logrus.Infoln("WMCrawlerCN stop crawling...")
 }
 
 func (crawler *WMCrawlerCN) PutStockCode(stockCode string) {

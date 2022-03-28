@@ -53,6 +53,6 @@ type GetCNStockJudgeResultResponse struct {
 }
 
 type SetCNStockStrategyRequest struct {
-	code string `json:"code" binding:"required"`
-	strategy model.StrategyCN `json:"strategy" binding:"required"`
+	Code     string           `json:"code" binding:"required"`
+	Strategy model.StrategyCN `json:"strategy" binding:"required"`
 }

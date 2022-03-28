@@ -1,0 +1,355 @@
+definitions:
+  handler.AddCNStockRequest:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+  handler.AddCNStockResponse:
+    properties:
+      resultCode:
+        type: integer
+      resultMsg:
+        type: string
+      successful:
+        type: boolean
+    type: object
+  handler.DelCNStockRequest:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+  handler.DelCNStockResponse:
+    properties:
+      resultCode:
+        type: integer
+      resultMsg:
+        type: string
+      successful:
+        type: boolean
+    type: object
+  handler.GetCNStockConditionResponse:
+    properties:
+      data:
+        type: string
+      resultCode:
+        type: integer
+      resultMsg:
+        type: string
+      successful:
+        type: boolean
+    type: object
+  handler.GetCNStockInfoResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/model.StockInfo'
+        type: array
+      resultCode:
+        type: integer
+      resultMsg:
+        type: string
+      successful:
+        type: boolean
+    type: object
+  handler.GetCNStockInfosResponse:
+    properties:
+      data:
+        additionalProperties:
+          items:
+            $ref: '#/definitions/model.StockInfo'
+          type: array
+        type: object
+      resultCode:
+        type: integer
+      resultMsg:
+        type: string
+      successful:
+        type: boolean
+    type: object
+  handler.GetCNStockJudgeResultResponse:
+    properties:
+      data:
+        $ref: '#/definitions/model.StockJudgeResult'
+      resultCode:
+        type: integer
+      resultMsg:
+        type: string
+      successful:
+        type: boolean
+    type: object
+  handler.SetCNStockConditionRequest:
+    properties:
+      condition:
+        type: string
+    required:
+    - condition
+    type: object
+  handler.SetCNStockConditionResponse:
+    properties:
+      resultCode:
+        type: integer
+      resultMsg:
+        type: string
+      successful:
+        type: boolean
+    type: object
+  handler.SetCNStockStrategyRequest:
+    properties:
+      code:
+        type: string
+      strategy:
+        $ref: '#/definitions/model.StrategyCN'
+    required:
+    - code
+    - strategy
+    type: object
+  model.StockInfo:
+    properties:
+      asset_liability_ratio:
+        type: string
+      cash_ratio:
+        type: string
+      code:
+        type: string
+      dividend_ratio:
+        type: string
+      gross_profit_ratio:
+        type: string
+      interest_ratio:
+        type: string
+      name:
+        type: string
+      pe:
+        type: string
+      period:
+        type: string
+      price:
+        type: string
+      roe:
+        type: string
+    type: object
+  model.StockJudgeResult:
+    properties:
+      can_buy:
+        type: boolean
+      can_sell:
+        type: boolean
+    type: object
+  model.StrategyCN:
+    properties:
+      aim_max_pe:
+        description: 卖出目标市场市盈率
+        type: number
+      aim_max_stock_pe:
+        description: 股票卖出市盈率
+        type: number
+      aim_min_pe:
+        description: 买入目标市场市盈率
+        type: number
+      aim_min_stock_pe:
+        description: 股票买入市盈率
+        type: number
+      pe_type:
+        type: integer
+      use_yield:
+        type: boolean
+    type: object
+info:
+  contact:
+    email: wuweimingoen@163.com
+    name: wuweiming
+  description: 提供股票信息相关接口
+  title: 股票信息获取
+  version: 1.0.0
+paths:
+  /cn/condition/get:
+    get:
+      consumes:
+      - application/json
+      operationId: "5"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GetCNStockConditionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.GetCNStockConditionResponse'
+      summary: 获取股票爬取条件
+      tags:
+      - A股
+  /cn/condition/set:
+    post:
+      consumes:
+      - application/json
+      operationId: "6"
+      parameters:
+      - description: 股票代码
+        in: body
+        name: code
+        required: true
+        schema:
+          $ref: '#/definitions/handler.SetCNStockConditionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.SetCNStockConditionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.SetCNStockConditionResponse'
+      summary: 设置股票爬取条件
+      tags:
+      - A股
+  /cn/judge/get:
+    get:
+      consumes:
+      - application/json
+      operationId: "7"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GetCNStockJudgeResultResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.GetCNStockJudgeResultResponse'
+      summary: 获取股票买卖判断结果
+      tags:
+      - A股
+  /cn/stock/add:
+    post:
+      consumes:
+      - application/json
+      operationId: "3"
+      parameters:
+      - description: 股票代码
+        in: body
+        name: code
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AddCNStockRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.AddCNStockResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.AddCNStockResponse'
+      summary: 增加股票
+      tags:
+      - A股
+  /cn/stock/del:
+    post:
+      consumes:
+      - application/json
+      operationId: "4"
+      parameters:
+      - description: 股票代码
+        in: body
+        name: code
+        required: true
+        schema:
+          $ref: '#/definitions/handler.DelCNStockRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.DelCNStockResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.DelCNStockResponse'
+      summary: 删除股票
+      tags:
+      - A股
+  /cn/stockInfo:
+    get:
+      consumes:
+      - application/json
+      operationId: "2"
+      parameters:
+      - description: 股票代码
+        in: query
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GetCNStockInfoResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.GetCNStockInfoResponse'
+      summary: 获取所指定A股信息
+      tags:
+      - A股
+  /cn/stockInfos:
+    get:
+      consumes:
+      - application/json
+      operationId: "1"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GetCNStockInfosResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.GetCNStockInfosResponse'
+      summary: 获取所有A股信息
+      tags:
+      - A股
+  /cn/strategy/set:
+    post:
+      consumes:
+      - application/json
+      operationId: "8"
+      parameters:
+      - description: 股票买卖策略信息
+        in: body
+        name: code
+        required: true
+        schema:
+          $ref: '#/definitions/handler.SetCNStockStrategyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.SetCNStockConditionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.SetCNStockConditionResponse'
+      summary: 设置股票买卖策略
+      tags:
+      - A股
+swagger: "2.0"

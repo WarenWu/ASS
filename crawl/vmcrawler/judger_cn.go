@@ -2,8 +2,11 @@ package wmcrawler
 
 import (
 	"ASS/config"
+	"ASS/crawl"
 	"ASS/model"
+	"context"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -22,20 +25,26 @@ type result struct {
 type WMJudgerCN struct {
 	results   map[string]result
 	strategys map[string]model.StrategyCN
-	isRunning chan struct{}
+	ctx       context.Context
+	cancel    context.CancelFunc
+	w         sync.WaitGroup
 }
 
 func NewCNJudger() (c *WMJudgerCN) {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &WMJudgerCN{
 		results:   make(map[string]result, 0),
 		strategys: make(map[string]model.StrategyCN, 0),
-		isRunning: make(chan struct{}),
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 }
 
 func (judger *WMJudgerCN) Start() {
+	judger.w.Add(1)
 	go func() {
-		logrus.Infoln("WMJudgerCN start...")
+		defer judger.w.Done()
+		logrus.Infoln("WMJudgerCN start(1)...")
 		for {
 			codes := StockCrawler_cn.GetStockCodes()
 			for _, v := range codes {
@@ -70,6 +79,7 @@ func (judger *WMJudgerCN) Start() {
 					AimStockMaxPE: float64(config.MaxStockPe),
 					AimStockMinPE: float64(config.MinStockPe),
 					UseYield:      true,
+					PEType:        crawl.SZ_PE,
 				}
 				if ok {
 					strategy = v
@@ -82,7 +92,7 @@ func (judger *WMJudgerCN) Start() {
 
 				judge.PE = StockCrawler_cn.GetPE(strategy.PEType)
 				judge.Yield = StockCrawler_cn.GetYield()
-				if judge.PE == 0 || judge.Yield == 0 {
+				if judge.UseYield && (judge.PE == 0 || judge.Yield == 0) {
 					continue
 				}
 				r := result{}
@@ -94,13 +104,16 @@ func (judger *WMJudgerCN) Start() {
 
 			select {
 			case <-time.After(time.Second * interval):
-			case <-judger.isRunning:
-				logrus.Infoln("WMJudgerCN stop...")
+			case <-judger.ctx.Done():
 				return
 			}
 		}
+
 	}()
+	judger.w.Add(1)
 	go func() {
+		defer judger.w.Done()
+		logrus.Infoln("WMJudgerCN start(2)...")
 		for k, v := range judger.results {
 			if time.Now().Second()-v.time > interval {
 				delete(judger.results, k)
@@ -108,15 +121,16 @@ func (judger *WMJudgerCN) Start() {
 		}
 		select {
 		case <-time.After(time.Second * 1):
-		case <-judger.isRunning:
-			logrus.Infoln("WMJudgerCN stop...")
+		case <-judger.ctx.Done():
 			return
 		}
 	}()
 }
 
 func (judger *WMJudgerCN) Stop() {
-	judger.isRunning <- struct{}{}
+	judger.cancel()
+	judger.w.Wait()
+	logrus.Infoln("WMJudgerCN stop...")
 }
 
 func (judger *WMJudgerCN) SetStrategy(code string, strategy model.StrategyCN) {

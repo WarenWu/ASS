@@ -9,16 +9,15 @@ import (
 	crawler "ASS/crawl/vmcrawler"
 )
 
-// @Summary 获取所有A股票池信息
+// @Summary 获取所有A股信息
 // @Id 1
 // @Tags A股
 // @version 1.0.0
 // @Accept application/json
 // @Produce application/json
-// @Param streamName query string true "流id"
-// @Success 200 object handler.GetStreamInfoResponse 成功后返回值
-// @Failure 400 object handler.GetStreamInfoResponse 参数不对
-// @Router /streamInfo [get]
+// @Success 200 object handler.GetCNStockInfosResponse 成功后返回值
+// @Failure 400 object handler.GetCNStockInfosResponse 参数不对
+// @Router /cn/stockInfos [get]
 func GetStockInfos(c *gin.Context) {
 	msg := GetCNStockInfosResponse{
 		BaseResponse: baseMsg,
@@ -28,6 +27,16 @@ func GetStockInfos(c *gin.Context) {
 	c.JSON(msg.ResultCode, msg)
 }
 
+// @Summary 获取所指定A股信息
+// @Id 2
+// @Tags A股
+// @version 1.0.0
+// @Accept application/json
+// @Produce application/json
+// @Param code query string true "股票代码"
+// @Success 200 object handler.GetCNStockInfoResponse 成功后返回值
+// @Failure 400 object handler.GetCNStockInfoResponse 参数不对
+// @Router /cn/stockInfo [get]
 func GetStockInfo(c *gin.Context) {
 	code := c.Query("code")
 	msg := GetCNStockInfoResponse{
@@ -37,6 +46,16 @@ func GetStockInfo(c *gin.Context) {
 	c.JSON(msg.ResultCode, msg)
 }
 
+// @Summary 增加股票
+// @Id 3
+// @Tags A股
+// @version 1.0.0
+// @Accept application/json
+// @Produce application/json
+// @Param code body handler.AddCNStockRequest true "股票代码"
+// @Success 200 object handler.AddCNStockResponse 成功后返回值
+// @Failure 400 object handler.AddCNStockResponse 参数不对
+// @Router /cn/stock/add [post]
 func AddStock(c *gin.Context) {
 	msg := AddCNStockResponse{
 		BaseResponse: baseMsg,
@@ -54,6 +73,16 @@ func AddStock(c *gin.Context) {
 	c.JSON(msg.ResultCode, msg)
 }
 
+// @Summary 删除股票
+// @Id 4
+// @Tags A股
+// @version 1.0.0
+// @Accept application/json
+// @Produce application/json
+// @Param code body handler.DelCNStockRequest true "股票代码"
+// @Success 200 object handler.DelCNStockResponse 成功后返回值
+// @Failure 400 object handler.DelCNStockResponse 参数不对
+// @Router /cn/stock/del [post]
 func DelStock(c *gin.Context) {
 	msg := DelCNStockResponse{
 		BaseResponse: baseMsg,
@@ -71,6 +100,15 @@ func DelStock(c *gin.Context) {
 	c.JSON(msg.ResultCode, msg)
 }
 
+// @Summary 获取股票爬取条件
+// @Id 5
+// @Tags A股
+// @version 1.0.0
+// @Accept application/json
+// @Produce application/json
+// @Success 200 object handler.GetCNStockConditionResponse 成功后返回值
+// @Failure 400 object handler.GetCNStockConditionResponse 参数不对
+// @Router /cn/condition/get [get]
 func GetStockCondtion(c *gin.Context) {
 	msg := GetCNStockConditionResponse{
 		BaseResponse: baseMsg,
@@ -79,6 +117,16 @@ func GetStockCondtion(c *gin.Context) {
 	c.JSON(msg.ResultCode, msg)
 }
 
+// @Summary 设置股票爬取条件
+// @Id 6
+// @Tags A股
+// @version 1.0.0
+// @Accept application/json
+// @Produce application/json
+// @Param code body handler.SetCNStockConditionRequest true "股票代码"
+// @Success 200 object handler.SetCNStockConditionResponse 成功后返回值
+// @Failure 400 object handler.SetCNStockConditionResponse 参数不对
+// @Router /cn/condition/set [post]
 func SetStockCondtion(c *gin.Context) {
 	msg := SetCNStockConditionResponse{
 		BaseResponse: baseMsg,
@@ -96,6 +144,15 @@ func SetStockCondtion(c *gin.Context) {
 	c.JSON(msg.ResultCode, msg)
 }
 
+// @Summary 获取股票买卖判断结果
+// @Id 7
+// @Tags A股
+// @version 1.0.0
+// @Accept application/json
+// @Produce application/json
+// @Success 200 object handler.GetCNStockJudgeResultResponse 成功后返回值
+// @Failure 400 object handler.GetCNStockJudgeResultResponse 参数不对
+// @Router /cn/judge/get [get]
 func GetJudgeResult(c *gin.Context) {
 	code := c.Query("code")
 	msg := GetCNStockJudgeResultResponse{
@@ -105,6 +162,16 @@ func GetJudgeResult(c *gin.Context) {
 	c.JSON(msg.ResultCode, msg)
 }
 
+// @Summary 设置股票买卖策略
+// @Id 8
+// @Tags A股
+// @version 1.0.0
+// @Accept application/json
+// @Produce application/json
+// @Param code body handler.SetCNStockStrategyRequest true "股票买卖策略信息"
+// @Success 200 object handler.SetCNStockConditionResponse 成功后返回值
+// @Failure 400 object handler.SetCNStockConditionResponse 参数不对
+// @Router /cn/strategy/set [post]
 func SetStockStrategy(c *gin.Context) {
 	msg := SetCNStockConditionResponse{
 		BaseResponse: baseMsg,
@@ -117,7 +184,7 @@ func SetStockStrategy(c *gin.Context) {
 		msg.ResultMsg = "pararms exception!"
 		msg.Successful = false
 	} else {
-		crawler.Judger_cn.SetStrategy(r.code, r.strategy)
+		crawler.Judger_cn.SetStrategy(r.Code, r.Strategy)
 	}
 	c.JSON(msg.ResultCode, msg)
 }
