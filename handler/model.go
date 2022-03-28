@@ -56,3 +56,13 @@ type SetCNStockStrategyRequest struct {
 	Code     string           `json:"code" binding:"required"`
 	Strategy model.StrategyCN `json:"strategy" binding:"required"`
 }
+
+type GetCanBuyStocksResponse struct {
+	BaseResponse
+	Data []string `json:"data"`
+}
+
+type GetCanSellStocksResponse struct {
+	BaseResponse
+	Data []string `json:"data"`
+}

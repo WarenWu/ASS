@@ -26,6 +26,64 @@ var doc = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/cn/canbuy/get": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "A股"
+                ],
+                "summary": "获取股票爬取条件",
+                "operationId": "9",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.GetCanBuyStocksResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.GetCanBuyStocksResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/cn/cansell/get": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "A股"
+                ],
+                "summary": "获取股票爬取条件",
+                "operationId": "10",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.GetCanSellStocksResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.GetCanSellStocksResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/cn/condition/get": {
             "get": {
                 "consumes": [
@@ -108,6 +166,15 @@ var doc = `{
                 ],
                 "summary": "获取股票买卖判断结果",
                 "operationId": "7",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "股票代码",
+                        "name": "code",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -428,6 +495,46 @@ var doc = `{
             "properties": {
                 "data": {
                     "$ref": "#/definitions/model.StockJudgeResult"
+                },
+                "resultCode": {
+                    "type": "integer"
+                },
+                "resultMsg": {
+                    "type": "string"
+                },
+                "successful": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handler.GetCanBuyStocksResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "resultCode": {
+                    "type": "integer"
+                },
+                "resultMsg": {
+                    "type": "string"
+                },
+                "successful": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handler.GetCanSellStocksResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "resultCode": {
                     "type": "integer"

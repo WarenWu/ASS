@@ -150,6 +150,7 @@ func SetStockCondtion(c *gin.Context) {
 // @version 1.0.0
 // @Accept application/json
 // @Produce application/json
+// @Param   code query string true "股票代码"
 // @Success 200 object handler.GetCNStockJudgeResultResponse 成功后返回值
 // @Failure 400 object handler.GetCNStockJudgeResultResponse 参数不对
 // @Router /cn/judge/get [get]
@@ -185,6 +186,40 @@ func SetStockStrategy(c *gin.Context) {
 		msg.Successful = false
 	} else {
 		crawler.Judger_cn.SetStrategy(r.Code, r.Strategy)
+	}
+	c.JSON(msg.ResultCode, msg)
+}
+
+// @Summary 获取股票爬取条件
+// @Id 9
+// @Tags A股
+// @version 1.0.0
+// @Accept application/json
+// @Produce application/json
+// @Success 200 object handler.GetCanBuyStocksResponse 成功后返回值
+// @Failure 400 object handler.GetCanBuyStocksResponse 参数不对
+// @Router /cn/canbuy/get [get]
+func GetCanBuyStocks(c *gin.Context) {
+	msg := GetCanBuyStocksResponse{
+		BaseResponse: baseMsg,
+		Data:         crawler.Judger_cn.GetCanBuyStocks(),
+	}
+	c.JSON(msg.ResultCode, msg)
+}
+
+// @Summary 获取股票爬取条件
+// @Id 10
+// @Tags A股
+// @version 1.0.0
+// @Accept application/json
+// @Produce application/json
+// @Success 200 object handler.GetCanSellStocksResponse 成功后返回值
+// @Failure 400 object handler.GetCanSellStocksResponse 参数不对
+// @Router /cn/cansell/get [get]
+func GetCanSellStocks(c *gin.Context) {
+	msg := GetCanSellStocksResponse{
+		BaseResponse: baseMsg,
+		Data:         crawler.Judger_cn.GetCanSellStocks(),
 	}
 	c.JSON(msg.ResultCode, msg)
 }

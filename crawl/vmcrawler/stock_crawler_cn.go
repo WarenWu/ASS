@@ -22,8 +22,14 @@ import (
 	"ASS/utils"
 )
 
+// var StockCrawler_cn = NewCNCrawl(
+// 	`连续 5 年 ROE 大于 20%，连续 5 年净利润现金含量大于 80%，连续 5 年毛利率大于 30%，上市大于三年`,
+// 	10,
+// 	config.CrawlTimeout,
+// )
+
 var StockCrawler_cn = NewCNCrawl(
-	`连续 5 年 ROE 大于 20%，连续 5 年净利润现金含量大于 80%，连续 5 年毛利率大于 30%，上市大于三年`,
+	`连续 5 年 ROE 大于 20%，，上市大于三年`,
 	10,
 	config.CrawlTimeout,
 )
@@ -148,7 +154,8 @@ func (crawler *WMCrawlerCN) crawlStockCodes() {
 		stockCodes = append(stockCodes, stockInfo["code"].(string))
 	}
 	crawler.stockCodesMtx.Lock()
-	crawler.stockCodes = stockCodes
+	crawler.stockCodes = append(crawler.stockCodes, stockCodes...)
+	crawler.stockCodes = RemoveRepByMap(crawler.stockCodes)
 	crawler.stockCodesMtx.Unlock()
 }
 
@@ -203,7 +210,6 @@ func (crawler *WMCrawlerCN) crawlStockInfo(stockCode string) {
 		case crawl.ROE:
 			crawler.crawlStockROE(stockCode)
 		case crawl.CASH_RATIO:
-			time.Sleep(10 * time.Second)
 			crawler.crawlStockCashRatio(stockCode)
 		case crawl.ASSET_LIABILITY_RATIO:
 			crawler.crawlStockAssetLiabilityRatio(stockCode)
@@ -366,6 +372,7 @@ func (crawler *WMCrawlerCN) CrawlFromIndex(condition string) string {
 			return nil
 		}),
 		chromedp.Navigate(`http://www.iwencai.com/unifiedwap/home/index`),
+		chromedp.Sleep(time.Second*3),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			cookies, err := network.GetAllCookies().Do(ctx)
 			if err != nil {
@@ -996,4 +1003,28 @@ func (crawler *WMCrawlerCN) updateStockInfo(code string, period string, stockInf
 	} else {
 		logrus.Errorln(result.Error)
 	}
+}
+
+func RemoveRepByMap(slc []string) []string {
+
+	result := []string{}
+
+	tempMap := map[string]byte{} // 存放不重复主键
+
+	for _, e := range slc {
+
+		l := len(tempMap)
+
+		tempMap[e] = 0
+
+		if len(tempMap) != l { // 加入map后，map长度变化，则元素不重复
+
+			result = append(result, e)
+
+		}
+
+	}
+
+	return result
+
 }

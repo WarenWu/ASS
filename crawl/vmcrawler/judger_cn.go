@@ -143,3 +143,23 @@ func (judger *WMJudgerCN) GetJudgeResult(code string) (result model.StockJudgeRe
 	result.CanSell = judger.results[code].canSell
 	return
 }
+
+func (judger *WMJudgerCN) GetCanBuyStocks() (codes []string) {
+	codes = []string{}
+	for k, v := range judger.results {
+		if v.canBuy {
+			codes = append(codes, k)
+		}
+	}
+	return
+}
+
+func (judger *WMJudgerCN) GetCanSellStocks() (codes []string) {
+	codes = []string{}
+	for k, v := range judger.results {
+		if v.canSell {
+			codes = append(codes, k)
+		}
+	}
+	return
+}

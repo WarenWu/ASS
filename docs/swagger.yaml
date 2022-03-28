@@ -81,6 +81,32 @@ definitions:
       successful:
         type: boolean
     type: object
+  handler.GetCanBuyStocksResponse:
+    properties:
+      data:
+        items:
+          type: string
+        type: array
+      resultCode:
+        type: integer
+      resultMsg:
+        type: string
+      successful:
+        type: boolean
+    type: object
+  handler.GetCanSellStocksResponse:
+    properties:
+      data:
+        items:
+          type: string
+        type: array
+      resultCode:
+        type: integer
+      resultMsg:
+        type: string
+      successful:
+        type: boolean
+    type: object
   handler.SetCNStockConditionRequest:
     properties:
       condition:
@@ -166,6 +192,44 @@ info:
   title: 股票信息获取
   version: 1.0.0
 paths:
+  /cn/canbuy/get:
+    get:
+      consumes:
+      - application/json
+      operationId: "9"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GetCanBuyStocksResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.GetCanBuyStocksResponse'
+      summary: 获取股票爬取条件
+      tags:
+      - A股
+  /cn/cansell/get:
+    get:
+      consumes:
+      - application/json
+      operationId: "10"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GetCanSellStocksResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.GetCanSellStocksResponse'
+      summary: 获取股票爬取条件
+      tags:
+      - A股
   /cn/condition/get:
     get:
       consumes:
@@ -216,6 +280,12 @@ paths:
       consumes:
       - application/json
       operationId: "7"
+      parameters:
+      - description: 股票代码
+        in: query
+        name: code
+        required: true
+        type: string
       produces:
       - application/json
       responses:
