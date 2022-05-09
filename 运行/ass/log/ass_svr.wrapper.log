@@ -1,0 +1,26 @@
+2022-05-09 16:52:16,668 DEBUG - Starting WinSW in console mode
+2022-05-09 16:52:16,919 INFO  - Installing the service with id 'ass'
+2022-05-09 16:52:16,930 DEBUG - Completed. Exit code is 0
+2022-05-09 16:53:05,185 DEBUG - Starting WinSW in service mode
+2022-05-09 16:53:05,199 INFO  - Starting C:\Users\Lenovo\Desktop\ASS\运行\ass\bin --configFileName=ass_config --configFilePath=C:\Users\Lenovo\Desktop\ASS\运行\ass\conf 
+2022-05-09 16:53:05,224 DEBUG - Completed. Exit code is 0
+2022-05-09 16:54:11,389 DEBUG - Starting WinSW in service mode
+2022-05-09 16:54:11,402 INFO  - Starting C:\Users\Lenovo\Desktop\ASS\运行\ass\bin\ASS.exe --configFileName=ass_config --configFilePath=C:\Users\Lenovo\Desktop\ASS\运行\ass\conf 
+2022-05-09 16:54:11,433 DEBUG - Completed. Exit code is 0
+2022-05-09 16:54:16,923 DEBUG - Starting WinSW in console mode
+2022-05-09 16:54:17,184 INFO  - Uninstalling the service with id 'ass'
+2022-05-09 16:54:17,189 DEBUG - Completed. Exit code is 0
+2022-05-09 16:54:19,380 DEBUG - Starting WinSW in console mode
+2022-05-09 16:54:19,629 INFO  - Installing the service with id 'ass'
+2022-05-09 16:54:19,640 DEBUG - Completed. Exit code is 0
+2022-05-09 16:54:32,173 DEBUG - Starting WinSW in service mode
+2022-05-09 16:54:32,187 INFO  - Starting C:\Users\Lenovo\Desktop\ASS\运行\ass\bin\ASS.exe --configFileName=ass_config --configFilePath=C:\Users\Lenovo\Desktop\ASS\运行\ass\conf 
+2022-05-09 16:54:32,212 DEBUG - Completed. Exit code is 0
+2022-05-09 16:54:36,397 DEBUG - Starting WinSW in console mode
+2022-05-09 16:54:36,644 INFO  - Starting the service with id 'ass'
+2022-05-09 16:54:36,724 DEBUG - Starting WinSW in service mode
+2022-05-09 16:54:36,734 DEBUG - Completed. Exit code is 0
+2022-05-09 16:54:36,763 DEBUG - Completed. Exit code is 0
+2022-05-09 16:54:40,885 DEBUG - Starting WinSW in service mode
+2022-05-09 16:54:40,899 INFO  - Starting C:\Users\Lenovo\Desktop\ASS\运行\ass\bin\ASS.exe --configFileName=ass_config --configFilePath=C:\Users\Lenovo\Desktop\ASS\运行\ass\conf 
+2022-05-09 16:54:40,924 DEBUG - Completed. Exit code is 0

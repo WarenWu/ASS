@@ -22,17 +22,17 @@ import (
 	"ASS/utils"
 )
 
-// var StockCrawler_cn = NewCNCrawl(
-// 	`连续 5 年 ROE 大于 20%，连续 5 年净利润现金含量大于 80%，连续 5 年毛利率大于 30%，上市大于三年`,
-// 	10,
-// 	config.CrawlTimeout,
-// )
-
 var StockCrawler_cn = NewCNCrawl(
-	`连续 5 年 ROE 大于 20%，，上市大于三年`,
+	`连续 5 年 ROE 大于 20%，连续 5 年净利润现金含量大于 80%，连续 5 年毛利率大于 30%，上市大于三年`,
 	10,
 	config.CrawlTimeout,
 )
+
+// var StockCrawler_cn = NewCNCrawl(
+// 	`连续 5 年 ROE 大于 20%，，上市大于三年`,
+// 	10,
+// 	config.CrawlTimeout,
+// )
 
 type WMCrawlerCN struct {
 	condition     string
@@ -78,7 +78,7 @@ func (crawler *WMCrawlerCN) Start() {
 	crawler.w.Add(1)
 	go func() {
 		defer crawler.w.Done()
-		logrus.Infoln("WMCrawlerCN start crawling...")
+		logrus.Infoln("WMCrawlerCN start crawling")
 		for {
 			crawler.crawlStockCodes()
 			crawler.crawlPE()
@@ -96,7 +96,7 @@ func (crawler *WMCrawlerCN) Start() {
 func (crawler *WMCrawlerCN) Stop() {
 	crawler.cancel()
 	crawler.w.Wait()
-	logrus.Infoln("WMCrawlerCN stop crawling...")
+	logrus.Infoln("WMCrawlerCN stop crawling")
 }
 
 func (crawler *WMCrawlerCN) PutStockCode(stockCode string) {
@@ -171,7 +171,9 @@ func (crawler *WMCrawlerCN) GetStockInfos(filter crawl.Filter) map[string][]mode
 func (crawler *WMCrawlerCN) crawlStockInfos() {
 	stockCodes := crawler.GetStockCodes()
 	for _, code := range stockCodes {
+		crawler.w.Add(1)
 		go func(code string) {
+			defer crawler.w.Done()
 			crawler.crawlStockInfo(code)
 		}(code)
 		//crawler.crawlStockInfo(code)
