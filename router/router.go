@@ -37,6 +37,8 @@ func InitHttpRouter() {
 	router.POST("/cn/strategy/set", handler.SetStockStrategy)
 	router.GET("/cn/canbuy/get", handler.GetCanBuyStocks)
 	router.GET("/cn/cansell/get", handler.GetCanSellStocks)
+	router.GET("/cn/pe/get", handler.GetPE)
+	router.GET("/cn/yield/get", handler.GetYield)
 	router.GET("/swagger/*any", gs.DisablingWrapHandler(swaggerFiles.Handler, "DISABLE_SWAG"))
 }
 

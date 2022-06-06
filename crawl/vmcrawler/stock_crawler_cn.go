@@ -236,6 +236,11 @@ func (crawler *WMCrawlerCN) GetPE(t int) (pe float64) {
 }
 
 func (crawler *WMCrawlerCN) crawlPE() {
+	crawler.crawlshPE()
+	crawler.crawlszPE()
+}
+
+func (crawler *WMCrawlerCN) crawlshPE() {
 	defer func() {
 		if err := recover(); err != nil {
 			logrus.Errorln(err)
@@ -267,30 +272,69 @@ func (crawler *WMCrawlerCN) crawlPE() {
 			}
 			return nil
 		}),
-		chromedp.Navigate(`http://value500.com/PE.asp`),
+		chromedp.Navigate(`http://www.sse.com.cn/market/stockdata/price/sh/`),
 		chromedp.Sleep(1000*time.Millisecond),
 		chromedp.Evaluate(`
-		shA = document.querySelector('div:nth-child(3)>table:nth-child(4)>tbody>tr:nth-child(1)>td:nth-child(2)>table:nth-child(1)>tbody>tr:nth-child(1)>td:nth-child(1)>table:nth-child(4)>tbody>tr:nth-child(2)>td:nth-child(2)').innerText;
-		szA = document.querySelector('div:nth-child(3)>table:nth-child(4)>tbody>tr:nth-child(1)>td:nth-child(2)>table:nth-child(1)>tbody>tr:nth-child(1)>td:nth-child(1)>table:nth-child(4)>tbody>tr:nth-child(2)>td:nth-child(3)').innerText;
-		shA +":"+ szA;
+		shA = document.querySelector('.search_shasyl>tbody>tr:nth-child(22)>td:nth-child(3)').innerText;
 		`, &text),
 	)
 	if err != nil {
 		logrus.Errorln(err)
 		return
 	}
-	pes := strings.Split(text, ":")
-	if len(pes) == 2 {
-		crawler.pe_sh, err = strconv.ParseFloat(pes[0], 64)
-		if err != nil {
+	crawler.pe_sh, err = strconv.ParseFloat(text, 64)
+	if err != nil {
+		logrus.Errorln(err)
+		return
+	}
+}
+
+func (crawler *WMCrawlerCN) crawlszPE() {
+	defer func() {
+		if err := recover(); err != nil {
 			logrus.Errorln(err)
-			return
 		}
-		crawler.pe_sz, err = strconv.ParseFloat(pes[1], 64)
-		if err != nil {
-			logrus.Errorln(err)
-			return
-		}
+	}()
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", config.Headless),
+		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
+	)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(crawler.crawlTimeout)*time.Second)
+	defer cancel()
+	allocCtx, cancel := chromedp.NewExecAllocator(timeoutCtx, opts...)
+	defer cancel()
+
+	ctx, cancel := chromedp.NewContext(
+		allocCtx,
+		chromedp.WithLogf(logrus.Printf),
+	)
+	defer cancel()
+
+	const expr = `delete navigator.__proto__.webdriver;` //绕过爬虫检测
+	var text string
+	err := chromedp.Run(ctx,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
+			if err != nil {
+				logrus.Errorln(err)
+				return err
+			}
+			return nil
+		}),
+		chromedp.Navigate(`http://www.szse.cn/market/stock/indicator/index.html`),
+		chromedp.Sleep(1000*time.Millisecond),
+		chromedp.Evaluate(`
+		shA = document.querySelector('.table-responsive.table-tab1>tbody>tr:nth-child(12)>td:nth-child(2)').innerText;
+		`, &text),
+	)
+	if err != nil {
+		logrus.Errorln(err)
+		return
+	}
+	crawler.pe_sz, err = strconv.ParseFloat(text, 64)
+	if err != nil {
+		logrus.Errorln(err)
+		return
 	}
 }
 

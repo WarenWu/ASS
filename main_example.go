@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"time"
 
@@ -353,4 +354,57 @@ func main5() {
 		logrus.Error(err)
 		return
 	}
+}
+
+//PE
+func main6() {
+	// 禁用chrome headless
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", false),
+		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36`),
+	)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	allocCtx, cancel := chromedp.NewExecAllocator(timeoutCtx, opts...)
+	defer cancel()
+	// create chrome instance
+	ctx, cancel := chromedp.NewContext(
+		allocCtx,
+		chromedp.WithLogf(logrus.Printf),
+	)
+	defer cancel()
+
+	const expr = `delete navigator.__proto__.webdriver;`
+
+	var text string
+	err := chromedp.Run(ctx,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			_, err := page.AddScriptToEvaluateOnNewDocument(expr).Do(ctx)
+			if err != nil {
+				logrus.Errorln(err)
+				return err
+			}
+			return nil
+		}),
+		// chromedp.Navigate(`http://www.sse.com.cn/market/stockdata/price/sh/`),
+		// chromedp.Sleep(1000*time.Millisecond),
+		// chromedp.Evaluate(`
+		// shA = document.querySelector('.search_shasyl>tbody>tr:nth-child(22)>td:nth-child(3)').innerText;
+		// `, &text),
+		chromedp.Navigate(`http://www.szse.cn/market/stock/indicator/index.html`),
+		chromedp.Sleep(1000*time.Millisecond),
+		chromedp.Evaluate(`
+		shA = document.querySelector('.table-responsive.table-tab1>tbody>tr:nth-child(12)>td:nth-child(2)').innerText;
+		`, &text),
+	)
+	if err != nil {
+		logrus.Errorln(err)
+		return
+	}
+	pe_sh, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		logrus.Errorln(err)
+		return
+	}
+	logrus.Debugln(pe_sh)
 }

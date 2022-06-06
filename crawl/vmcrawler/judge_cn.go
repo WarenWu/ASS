@@ -1,9 +1,5 @@
 package wmcrawler
 
-import (
-	"math"
-)
-
 type WMJudgeCN struct {
 	StockPrice    float64
 	StockPE       float64
@@ -21,12 +17,12 @@ func (Judge *WMJudgeCN) BuyJudge() bool {
 	if Judge.UseYield {
 		return Judge.PE <= Judge.AimMinPE &&
 			Judge.StockPE <= Judge.AimStockMinPE &&
-			Judge.StockYield >= Judge.Yield &&
-			Judge.StockPrice <= Judge.aimPrice()
+			Judge.StockYield >= Judge.Yield // ||
+		//Judge.StockPrice <= Judge.aimPrice()
 	} else {
 		return Judge.PE <= Judge.AimMinPE &&
-			Judge.StockPE <= Judge.AimStockMinPE &&
-			Judge.StockPrice <= Judge.aimPrice()
+			Judge.StockPE <= Judge.AimStockMinPE // ||
+		//Judge.StockPrice <= Judge.aimPrice()
 	}
 
 }
@@ -34,23 +30,12 @@ func (Judge *WMJudgeCN) BuyJudge() bool {
 //卖出和价格无关。需长期持有
 func (Judge *WMJudgeCN) SellJudge() bool {
 	if Judge.UseYield {
-		return Judge.PE >= Judge.AimMaxPE &&
-			Judge.StockPE >= Judge.AimStockMaxPE &&
+		return Judge.PE >= Judge.AimMaxPE ||
+			Judge.StockPE >= Judge.AimStockMaxPE ||
 			Judge.StockYield <= Judge.Yield
 	} else {
-		return Judge.PE >= Judge.AimMaxPE &&
+		return Judge.PE >= Judge.AimMaxPE ||
 			Judge.StockPE >= Judge.AimStockMaxPE
 	}
 
-}
-
-func (Judge *WMJudgeCN) aimPrice() float64 {
-	if Judge.UseYield {
-		priceFormPE := Judge.StockPrice * Judge.AimMinPE / Judge.AimStockMinPE
-		priceFromYiled := Judge.StockYield / Judge.Yield
-		return math.Min(priceFormPE, priceFromYiled)
-	} else {
-		priceFormPE := Judge.StockPrice * Judge.AimMinPE / Judge.AimStockMinPE
-		return priceFormPE
-	}
 }

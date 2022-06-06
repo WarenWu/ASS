@@ -191,6 +191,35 @@ var doc = `{
                 }
             }
         },
+        "/cn/pe/get": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "A股"
+                ],
+                "summary": "获取市盈率",
+                "operationId": "11",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.GetPEResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.GetPEResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/cn/stock/add": {
             "post": {
                 "consumes": [
@@ -377,6 +406,35 @@ var doc = `{
                     }
                 }
             }
+        },
+        "/cn/yield/get": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "A股"
+                ],
+                "summary": "获取国债收益率",
+                "operationId": "12",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.GetYieldResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.GetYieldResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -535,6 +593,43 @@ var doc = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "resultCode": {
+                    "type": "integer"
+                },
+                "resultMsg": {
+                    "type": "string"
+                },
+                "successful": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handler.GetPEResponse": {
+            "type": "object",
+            "properties": {
+                "SH": {
+                    "type": "number"
+                },
+                "SZ": {
+                    "type": "number"
+                },
+                "resultCode": {
+                    "type": "integer"
+                },
+                "resultMsg": {
+                    "type": "string"
+                },
+                "successful": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handler.GetYieldResponse": {
+            "type": "object",
+            "properties": {
+                "CH": {
+                    "type": "number"
                 },
                 "resultCode": {
                     "type": "integer"

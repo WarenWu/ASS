@@ -66,3 +66,14 @@ type GetCanSellStocksResponse struct {
 	BaseResponse
 	Data []string `json:"data"`
 }
+
+type GetPEResponse struct {
+	BaseResponse
+	SH float64 `json:"SH"`
+	SZ float64 `json:"SZ"`
+}
+
+type GetYieldResponse struct {
+	BaseResponse
+	CH float64 `json:"CH"`
+}

@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
+	"ASS/crawl"
 	crawler "ASS/crawl/vmcrawler"
 )
 
@@ -220,6 +221,41 @@ func GetCanSellStocks(c *gin.Context) {
 	msg := GetCanSellStocksResponse{
 		BaseResponse: baseMsg,
 		Data:         crawler.Judger_cn.GetCanSellStocks(),
+	}
+	c.JSON(msg.ResultCode, msg)
+}
+
+// @Summary 获取市盈率
+// @Id 11
+// @Tags A股
+// @version 1.0.0
+// @Accept application/json
+// @Produce application/json
+// @Success 200 object handler.GetPEResponse 成功后返回值
+// @Failure 400 object handler.GetPEResponse 参数不对
+// @Router /cn/pe/get [get]
+func GetPE(c *gin.Context) {
+	msg := GetPEResponse{
+		BaseResponse: baseMsg,
+		SZ:           crawler.StockCrawler_cn.GetPE(crawl.SZ_PE),
+		SH:           crawler.StockCrawler_cn.GetPE(crawl.SH_PE),
+	}
+	c.JSON(msg.ResultCode, msg)
+}
+
+// @Summary 获取国债收益率
+// @Id 12
+// @Tags A股
+// @version 1.0.0
+// @Accept application/json
+// @Produce application/json
+// @Success 200 object handler.GetYieldResponse 成功后返回值
+// @Failure 400 object handler.GetYieldResponse 参数不对
+// @Router /cn/yield/get [get]
+func GetYield(c *gin.Context) {
+	msg := GetYieldResponse{
+		BaseResponse: baseMsg,
+		CH:           crawler.StockCrawler_cn.GetYield(),
 	}
 	c.JSON(msg.ResultCode, msg)
 }

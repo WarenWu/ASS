@@ -107,6 +107,30 @@ definitions:
       successful:
         type: boolean
     type: object
+  handler.GetPEResponse:
+    properties:
+      SH:
+        type: number
+      SZ:
+        type: number
+      resultCode:
+        type: integer
+      resultMsg:
+        type: string
+      successful:
+        type: boolean
+    type: object
+  handler.GetYieldResponse:
+    properties:
+      CH:
+        type: number
+      resultCode:
+        type: integer
+      resultMsg:
+        type: string
+      successful:
+        type: boolean
+    type: object
   handler.SetCNStockConditionRequest:
     properties:
       condition:
@@ -300,6 +324,25 @@ paths:
       summary: 获取股票买卖判断结果
       tags:
       - A股
+  /cn/pe/get:
+    get:
+      consumes:
+      - application/json
+      operationId: "11"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GetPEResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.GetPEResponse'
+      summary: 获取市盈率
+      tags:
+      - A股
   /cn/stock/add:
     post:
       consumes:
@@ -420,6 +463,25 @@ paths:
           schema:
             $ref: '#/definitions/handler.SetCNStockConditionResponse'
       summary: 设置股票买卖策略
+      tags:
+      - A股
+  /cn/yield/get:
+    get:
+      consumes:
+      - application/json
+      operationId: "12"
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.GetYieldResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.GetYieldResponse'
+      summary: 获取国债收益率
       tags:
       - A股
 swagger: "2.0"

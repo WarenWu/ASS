@@ -6,9 +6,9 @@
     "debug": false,
     "crawltimeout":300,
     "headless":true,
-    "cn_stock_pe_max":20,
+    "cn_stock_pe_max":40,
     "cn_stock_pe_min":15,
-    "cn_pe_max":40,
+    "cn_pe_max":60,
     "cn_pe_min":20,
     "log": {
         "file": "./ass.log",
