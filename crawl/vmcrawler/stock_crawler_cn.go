@@ -81,6 +81,7 @@ func (crawler *WMCrawlerCN) Start() {
 		logrus.Infoln("WMCrawlerCN start crawling")
 		for {
 			crawler.crawlStockCodes()
+			crawler.deleteDbUnusedCodes()
 			crawler.crawlPE()
 			crawler.crawlYield()
 			crawler.crawlStockInfos()
@@ -275,7 +276,7 @@ func (crawler *WMCrawlerCN) crawlshPE() {
 		chromedp.Navigate(`http://www.sse.com.cn/market/stockdata/price/sh/`),
 		chromedp.Sleep(1000*time.Millisecond),
 		chromedp.Evaluate(`
-		shA = document.querySelector('.search_shasyl>tbody>tr:nth-child(22)>td:nth-child(3)').innerText;
+		document.querySelector('table.table.table-hover>tbody>tr:nth-child(20)>td:nth-child(3)').innerText;
 		`, &text),
 	)
 	if err != nil {
@@ -324,7 +325,7 @@ func (crawler *WMCrawlerCN) crawlszPE() {
 		chromedp.Navigate(`http://www.szse.cn/market/stock/indicator/index.html`),
 		chromedp.Sleep(1000*time.Millisecond),
 		chromedp.Evaluate(`
-		shA = document.querySelector('.table-responsive.table-tab1>tbody>tr:nth-child(12)>td:nth-child(2)').innerText;
+		document.querySelector('.table-responsive.table-tab1>tbody>tr:nth-child(12)>td:nth-child(2)').innerText;
 		`, &text),
 	)
 	if err != nil {
@@ -1048,6 +1049,26 @@ func (crawler *WMCrawlerCN) updateStockInfo(code string, period string, stockInf
 		}
 	} else {
 		logrus.Errorln(result.Error)
+	}
+}
+
+func (crawler *WMCrawlerCN) deleteDbUnusedCodes() {
+	commonInfos := []model.StockCommonInfo{}
+	result := model.DbEngine().Find(&commonInfos)
+	if result.Error == gorm.ErrRecordNotFound {
+		logrus.Errorln(result.Error)
+	} else {
+		tmpMap := make(map[string]int)
+		for i, v := range crawler.stockCodes {
+			tmpMap[v] = i
+		}
+		for _, n := range commonInfos {
+			if _, ok := tmpMap[n.Code]; !ok {
+				model.DbEngine().Where("code = ?", n.Code).Delete(&model.StockCommonInfo{})
+				model.DbEngine().Where("code = ?", n.Code).Delete(&model.StockInfo{})
+			}
+		}
+
 	}
 }
 

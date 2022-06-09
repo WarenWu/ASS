@@ -386,16 +386,16 @@ func main6() {
 			}
 			return nil
 		}),
-		// chromedp.Navigate(`http://www.sse.com.cn/market/stockdata/price/sh/`),
-		// chromedp.Sleep(1000*time.Millisecond),
-		// chromedp.Evaluate(`
-		// shA = document.querySelector('.search_shasyl>tbody>tr:nth-child(22)>td:nth-child(3)').innerText;
-		// `, &text),
-		chromedp.Navigate(`http://www.szse.cn/market/stock/indicator/index.html`),
+		chromedp.Navigate(`http://www.sse.com.cn/market/stockdata/price/sh/`),
 		chromedp.Sleep(1000*time.Millisecond),
 		chromedp.Evaluate(`
-		shA = document.querySelector('.table-responsive.table-tab1>tbody>tr:nth-child(12)>td:nth-child(2)').innerText;
+		document.querySelector('table.table.table-hover>tbody>tr:nth-child(20)>td:nth-child(3)').innerText;
 		`, &text),
+		// chromedp.Navigate(`http://www.szse.cn/market/stock/indicator/index.html`),
+		// chromedp.Sleep(1000*time.Millisecond),
+		// chromedp.Evaluate(`
+		// shA = document.querySelector('.table-responsive.table-tab1>tbody>tr:nth-child(12)>td:nth-child(2)').innerText;
+		// `, &text),
 	)
 	if err != nil {
 		logrus.Errorln(err)
